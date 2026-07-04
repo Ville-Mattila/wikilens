@@ -139,11 +139,14 @@ async function lookupInLanguage(title, lang, { exactMatch, size, signal }) {
   }
 
   // The summary thumbnail is ~330px wide; request a larger rendition so the
-  // square popup image stays sharp. Wikimedia only serves a fixed set of
-  // widths (330/500/960...) and rejects widths beyond the original, so use
-  // 500px and only when the original allows it.
+  // square popup image stays sharp (the card is 500 CSS px wide, so high-DPI
+  // wants ~1000). Wikimedia only serves a fixed set of widths (330/500/960…)
+  // and rejects widths beyond the original, so pick the largest safe bucket.
   let thumbnail = data.thumbnail?.source ?? null;
-  if (thumbnail && (data.originalimage?.width ?? 0) > 500) {
+  const originalWidth = data.originalimage?.width ?? 0;
+  if (thumbnail && originalWidth > 960) {
+    thumbnail = thumbnail.replace(/\/(\d+)px-/, "/960px-");
+  } else if (thumbnail && originalWidth > 500) {
     thumbnail = thumbnail.replace(/\/(\d+)px-/, "/500px-");
   }
 

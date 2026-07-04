@@ -9,9 +9,9 @@
   // textMax: the snippet area scrolls once the paragraph exceeds this height.
   // Medium and Large share dimensions; Large additionally shows quick facts.
   const SIZES = {
-    small: { width: 260, textMax: 110, title: 14, text: 12 },
-    medium: { width: 400, textMax: 290, title: 18, text: 14 },
-    large: { width: 400, textMax: 290, title: 18, text: 14 },
+    small: { width: 325, textMax: 110, title: 14, text: 12 },
+    medium: { width: 500, textMax: 290, title: 18, text: 14 },
+    large: { width: 500, textMax: 290, title: 18, text: 14 },
   };
 
   const THEMES = {

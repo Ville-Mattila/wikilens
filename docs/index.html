@@ -265,7 +265,7 @@
   .wl-card {
     position: absolute;
     z-index: 10;
-    width: 400px;
+    width: 500px;
     max-width: calc(100vw - 40px);
     background: var(--card-bg);
     color: var(--card-text);
@@ -665,7 +665,10 @@
         if (d.type === "standard" &&
             d.title.toLowerCase() === title.trim().toLowerCase()) {
           let thumb = d.thumbnail ? d.thumbnail.source : null;
-          if (thumb && d.originalimage && d.originalimage.width > 500) {
+          const ow = d.originalimage ? d.originalimage.width : 0;
+          if (thumb && ow > 960) {
+            thumb = thumb.replace(/\/(\d+)px-/, "/960px-");
+          } else if (thumb && ow > 500) {
             thumb = thumb.replace(/\/(\d+)px-/, "/500px-");
           }
           const [facts, images] = await Promise.all([
@@ -890,9 +893,9 @@
     demo.appendChild(card);
     // scale the card down proportionally when the demo box or viewport is
     // narrower than the card, so it always fits
-    const scale = Math.min(1, (host.width - 16) / 400, (innerWidth - 24) / 400);
+    const scale = Math.min(1, (host.width - 16) / 500, (innerWidth - 24) / 500);
     if (scale < 1) card.style.zoom = scale;
-    const w = 400 * scale;
+    const w = 500 * scale;
     let left = range.left - host.left + range.width / 2 - w / 2;
     left = Math.max(8, Math.min(left, host.width - w - 8));
     card.style.left = left / (scale || 1) + "px";
