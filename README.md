@@ -13,9 +13,11 @@ A Chromium extension that shows an instant Wikipedia preview when you select tex
    - the title and the article's full first paragraph, scrollable when long,
    - on the Large size, up to five quick facts from the article's infobox data — born, died, occupation, founded, population, website and the like — where each linkable value (a country, an occupation, a website) is clickable,
    - a **Read in Wikipedia →** link that opens the full article in a new tab.
-4. The popup fades away when you click elsewhere or clear the selection.
+4. The popup fades away when you click elsewhere, clear the selection, or press Esc.
 
-Redirects (e.g. "USA") and disambiguation pages don't trigger the popup — only exact article titles like "United States" or "Albert Einstein" do. Matching is case-insensitive, mirroring MediaWiki's own title normalization. All animations respect `prefers-reduced-motion`.
+Redirects (e.g. "USA") don't trigger the popup by default — only exact article titles like "United States" or "Albert Einstein" do (a setting relaxes this). Matching is case-insensitive, mirroring MediaWiki's own title normalization. Disambiguation titles show a "may refer to:" list — click a meaning to preview it in place. If a title doesn't exist in your chosen language edition, English Wikipedia is tried automatically. Lookups never fire inside inputs, textareas, or rich-text editors, results are cached, and all animations respect `prefers-reduced-motion`.
+
+The toolbar button opens a small popup with your recent lookups (stored only on your device) and a search box for looking up titles directly.
 
 ## Install (unpacked)
 
@@ -28,10 +30,12 @@ Redirects (e.g. "USA") and disambiguation pages don't trigger the popup — only
 
 Right-click the WikiLens icon → **Options** (opens in its own tab). Settings sync via `chrome.storage.sync` and apply immediately — no reload needed:
 
-- **Wikipedia language** — which Wikipedia edition to search, from 23 choices (default: English). Also used for quick-fact links.
+- **Wikipedia language** — which Wikipedia edition to search, from 23 choices (default: English). Also used for quick-fact links; English is tried as a fallback.
 - **Popup size** — Small, Medium, or Large. Small is compact; Medium and Large share roomier dimensions, and Large additionally shows the quick facts block.
-- **Theme** — Light or Dark (default: Dark).
-- **Exact title matches only** — when on (default), the preview appears only if the selection is exactly an article's title. Turn off to also follow Wikipedia redirects, e.g. selecting "USA" previews "United States". Disambiguation pages never show a preview.
+- **Theme** — Light, Dark, or Auto (follows the OS preference). Default: Dark.
+- **Trigger** — On select (default), or Alt + select for popups only when you ask.
+- **Exact title matches only** — when on (default), the preview appears only if the selection is exactly an article's title. Turn off to also follow Wikipedia redirects, e.g. selecting "USA" previews "United States".
+- **Disabled sites** — hostnames (one per line, subdomains included) where WikiLens stays quiet.
 
 ## Quick facts, technically
 
@@ -43,5 +47,7 @@ Every Wikipedia article links a Wikidata entity. For the Large popup, the servic
 - `content.js` — selection tracking, popup rendering (shadow DOM, so page CSS can't interfere), entrance/exit animations, positioning, size/theme application.
 - `background.js` — service worker performing the Wikipedia lookup and the Wikidata quick-facts resolution, avoiding page-level CORS/CSP restrictions.
 - `options.html` / `options.js` — the settings page.
+- `action.html` / `action.js` — the toolbar popup (recent lookups + title search).
+- `firefox/manifest.json` — the Firefox (AMO) manifest variant; build with `scripts/package.ps1 -Target firefox`.
 - `docs/` — the landing page served by GitHub Pages.
 - `store-assets/`, `STORE.md`, `PRIVACY.md`, `scripts/package.ps1` — Chrome Web Store submission materials.

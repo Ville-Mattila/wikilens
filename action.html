@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>WikiLens</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      width: 340px;
+      background: #171717;
+      color: #e8eaed;
+    }
+    .container {
+      box-sizing: border-box;
+      padding: 16px 18px 18px;
+      background: #202124;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 16px;
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+    .gear {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: none;
+      border: none;
+      color: #9aa0a6;
+      cursor: pointer;
+      font-size: 15px;
+      padding: 0;
+    }
+    .gear:hover {
+      background: #303134;
+      color: #e8eaed;
+    }
+    input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: 1px solid #5f6368;
+      background: #303134;
+      color: #e8eaed;
+    }
+    input[type="text"]::placeholder {
+      color: #9aa0a6;
+    }
+    .status {
+      font-size: 12px;
+      color: #9aa0a6;
+      margin: 8px 2px 0;
+      min-height: 14px;
+    }
+    .label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #9aa0a6;
+      margin: 18px 0 8px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 4px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .row:hover {
+      background: #303134;
+    }
+    .row .thumb {
+      flex: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: #303134;
+    }
+    .row .title {
+      font-size: 13px;
+      line-height: 1.3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .hint {
+      font-size: 12px;
+      line-height: 1.4;
+      color: #9aa0a6;
+      margin: 4px 2px 0;
+    }
+    #results,
+    #recents {
+      display: flex;
+      flex-direction: column;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>WikiLens</h1>
+      <button class="gear" id="settingsBtn" title="Settings" aria-label="Settings">⚙</button>
+    </header>
+
+    <input type="text" id="searchInput" placeholder="Look up an exact article title…" />
+    <p class="status" id="status"></p>
+
+    <div id="results"></div>
+
+    <span class="label">Recent lookups</span>
+    <div id="recents"></div>
+  </div>
+
+  <script src="action.js"></script>
+</body>
+</html>

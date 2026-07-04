@@ -22,8 +22,14 @@ first paragraph, and a link to read more.
 > — Exact by default: previews appear only when your selection is precisely
 > an article title, so the popup never gets in your way. Prefer looser
 > matching? One switch also resolves redirects like "USA" → "United States".
-> — 23 languages: point WikiLens at any major Wikipedia edition.
-> — Yours to shape: three popup sizes, light and dark themes.
+> Ambiguous titles show a tidy "may refer to:" list instead.
+> — 23 languages: point WikiLens at any major Wikipedia edition — with an
+> automatic English fallback when a title only exists there.
+> — Yours to shape: three popup sizes (Large adds quick facts from the
+> article's infobox, each a clickable link), light/dark/auto themes, an
+> optional Alt+select trigger, and a per-site disable list.
+> — A toolbar popup keeps your recent lookups at hand and lets you search
+> titles directly.
 > — Private by design: your selection travels to Wikipedia's API and nowhere
 > else. No analytics, no tracking, no accounts. Open source.
 
@@ -56,15 +62,18 @@ Paste these verbatim — both are under the dashboard's 1000-character limit.
 > choose in settings lives on its own subdomain (en.wikipedia.org,
 > fi.wikipedia.org, etc.). No other data is read or transmitted.
 
-**storage justification (452 chars):**
+**storage justification (647 chars):**
 
 > The storage permission saves the user's preferences via
-> chrome.storage.sync: Wikipedia language edition, popup size
-> (small/medium/large), light or dark theme, and the exact-title matching
-> mode. These settings are read by the service worker and content script to
-> render previews the way the user configured, and sync across the user's own
-> Chrome profiles. No user data, browsing data, or selected text is ever
-> stored - only these four preference values.
+> chrome.storage.sync: Wikipedia language edition, popup size, theme,
+> trigger mode, exact-title matching mode, and the user's own list of sites
+> where the extension is disabled. It also keeps a device-local list of the
+> user's last 10 previewed articles (title and Wikipedia URL) via
+> chrome.storage.local, shown in the toolbar popup as recent lookups.
+> Nothing is transmitted anywhere: sync values stay within the user's own
+> Chrome profile sync, and the recents list never leaves the device. No
+> browsing history is recorded - only articles the user explicitly
+> previewed by selecting their titles.
 
 ## Privacy practices tab answers
 

@@ -18,11 +18,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type !== "wikilens-lookup") return;
 
   lookupArticle(message.title)
-    .then((data) => sendResponse({ ok: true, data }))
+    .then((data) => {
+      sendResponse({ ok: true, data });
+      if (!data?.disambiguation) recordRecent(data); // fire-and-forget
+    })
     .catch(() => sendResponse({ ok: false }));
 
   return true; // keep the message channel open for the async response
 });
+
+// Records a successful (non-disambiguation) lookup into chrome.storage.local
+// so the toolbar popup can show recent lookups. Local-only and best-effort:
+// never let a storage failure affect the lookup response.
+const RECENTS_KEY = "recents";
+const RECENTS_LIMIT = 10;
+
+async function recordRecent(data) {
+  try {
+    const { [RECENTS_KEY]: recents } = await chrome.storage.local.get({
+      [RECENTS_KEY]: [],
+    });
+    const entry = {
+      title: data.title,
+      pageUrl: data.pageUrl,
+      thumbnail: data.thumbnail ?? null,
+      ts: Date.now(),
+    };
+    const deduped = recents.filter((r) => r.pageUrl !== entry.pageUrl);
+    deduped.unshift(entry);
+    await chrome.storage.local.set({
+      [RECENTS_KEY]: deduped.slice(0, RECENTS_LIMIT),
+    });
+  } catch {
+    // best-effort only
+  }
+}
 
 async function lookupArticle(title) {
   const { language, exactMatch, size } = await chrome.storage.sync.get({

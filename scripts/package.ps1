@@ -13,7 +13,7 @@ $staging = Join-Path $env:TEMP "wikilens-package"
 if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
 New-Item -ItemType Directory $staging | Out-Null
 
-foreach ($item in "manifest.json", "background.js", "content.js", "options.html", "options.js") {
+foreach ($item in "manifest.json", "background.js", "content.js", "options.html", "options.js", "action.html", "action.js") {
     Copy-Item (Join-Path $root $item) $staging
 }
 Copy-Item (Join-Path $root "icons") (Join-Path $staging "icons") -Recurse

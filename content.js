@@ -445,6 +445,9 @@
       btn.type = "button";
       btn.className = "option";
       btn.textContent = optionTitle;
+      // without this, mousedown collapses the page's text selection, the
+      // selectionchange handler dismisses the popup, and the click never runs
+      btn.addEventListener("mousedown", (e) => e.preventDefault());
       btn.addEventListener("click", () => selectDisambiguationOption(optionTitle));
       options.appendChild(btn);
     }
