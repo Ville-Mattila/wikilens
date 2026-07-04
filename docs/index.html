@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WikiLens — the free encyclopedia, one selection away</title>
+<meta name="description" content="WikiLens is a Chromium extension that shows an instant Wikipedia preview when you select text on any page." />
+<link rel="icon" href="icon128.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f5efe3;
+    --paper-deep: #ece4d2;
+    --ink: #211f1a;
+    --ink-soft: #57534a;
+    --rule: #c9bfa8;
+    --accent: #2a4b8d;
+    --highlight: #f8e08e;
+    --card-bg: #202124;
+    --card-text: #e8eaed;
+    --card-border: #5f6368;
+    --card-divider: #3c4043;
+    --card-link: #8ab4f8;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 19px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* paper grain */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    z-index: 1;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  ::selection {
+    background: var(--highlight);
+    color: var(--ink);
+  }
+
+  .sheet {
+    position: relative;
+    z-index: 2;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 0 28px 96px;
+  }
+
+  /* ------- masthead ------- */
+  .masthead {
+    text-align: center;
+    padding: 44px 0 26px;
+    animation: rise 0.7s ease-out both;
+  }
+  .masthead .over {
+    font-size: 12px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .masthead .rulewrap {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 18px 0;
+  }
+  .masthead .rulewrap::before,
+  .masthead .rulewrap::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--rule);
+    box-shadow: 0 3px 0 -2px var(--rule);
+  }
+  .masthead img {
+    width: 54px;
+    height: 54px;
+    display: block;
+  }
+
+  /* ------- entry ------- */
+  .entry { animation: rise 0.7s 0.12s ease-out both; }
+
+  h1 {
+    font-family: "Fraunces", serif;
+    font-optical-sizing: auto;
+    font-size: clamp(64px, 12vw, 118px);
+    font-weight: 560;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin: 10px 0 6px;
+  }
+  h1 .dot { color: var(--accent); }
+
+  .pron {
+    font-size: 20px;
+    color: var(--ink-soft);
+  }
+  .pron i { font-style: italic; }
+  .pron .pos {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .senses {
+    margin: 34px 0 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: sense;
+  }
+  .senses li {
+    counter-increment: sense;
+    position: relative;
+    padding-left: 44px;
+    margin-bottom: 18px;
+    max-width: 620px;
+  }
+  .senses li::before {
+    content: counter(sense) ".";
+    position: absolute;
+    left: 0;
+    top: 0;
+    font-family: "Fraunces", serif;
+    font-weight: 640;
+    font-size: 22px;
+    color: var(--accent);
+  }
+  .senses em { font-style: italic; }
+
+  .cta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin: 40px 0 0;
+    align-items: center;
+  }
+  .btn {
+    font-family: "Newsreader", serif;
+    font-size: 17px;
+    text-decoration: none;
+    padding: 12px 26px;
+    border-radius: 999px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn-primary {
+    background: var(--ink);
+    color: var(--paper);
+    box-shadow: 0 2px 0 var(--accent);
+  }
+  .btn-primary:hover { box-shadow: 0 5px 14px rgba(42, 75, 141, 0.35); }
+  .btn-ghost {
+    color: var(--ink);
+    border: 1px solid var(--ink);
+  }
+  .btn-ghost:hover { background: var(--paper-deep); }
+  .cta-note {
+    font-size: 15px;
+    font-style: italic;
+    color: var(--ink-soft);
+  }
+
+  /* ------- section headings ------- */
+  .section {
+    margin-top: 96px;
+    animation: rise 0.7s ease-out both;
+  }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 8px;
+    margin-bottom: 26px;
+  }
+  .section-head .no {
+    font-family: "Fraunces", serif;
+    font-size: 15px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+  }
+  h2 {
+    font-family: "Fraunces", serif;
+    font-size: 30px;
+    font-weight: 560;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  /* ------- demo ------- */
+  .demo-hint {
+    font-style: italic;
+    color: var(--ink-soft);
+    margin: 0 0 20px;
+  }
+  .demo {
+    position: relative;
+    background: var(--paper-deep);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 30px 34px;
+    box-shadow: 6px 6px 0 rgba(33, 31, 26, 0.06);
+  }
+  .demo p { margin: 0 0 1em; }
+  .demo p:last-child { margin-bottom: 0; }
+  .demo .term {
+    border-bottom: 2px dotted var(--accent);
+    cursor: text;
+  }
+  .demo .dropcap::first-letter {
+    font-family: "Fraunces", serif;
+    font-weight: 640;
+    font-size: 64px;
+    line-height: 0.8;
+    float: left;
+    padding: 8px 10px 0 0;
+    color: var(--accent);
+  }
+  .demo-status {
+    margin-top: 14px;
+    font-size: 14px;
+    font-style: italic;
+    color: var(--ink-soft);
+    min-height: 1.4em;
+  }
+
+  /* the popup card — same styling as the extension's dark medium card */
+  .wl-card {
+    position: absolute;
+    z-index: 10;
+    width: 320px;
+    max-width: calc(100vw - 40px);
+    background: var(--card-bg);
+    color: var(--card-text);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    animation: cardin 0.15s ease-out;
+  }
+  @keyframes cardin {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .wl-card img {
+    display: block;
+    width: 100%;
+    max-height: 160px;
+    object-fit: cover;
+    background: #303134;
+  }
+  .wl-card .b { padding: 12px 14px 10px; }
+  .wl-card .t {
+    font-family: Georgia, serif;
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0 0 6px;
+  }
+  .wl-card .x {
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+    max-height: 195px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--card-border) transparent;
+  }
+  .wl-card .f {
+    border-top: 1px solid var(--card-divider);
+    padding: 8px 14px;
+    text-align: right;
+  }
+  .wl-card .f a {
+    color: var(--card-link);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .wl-card .f a:hover { text-decoration: underline; }
+
+  /* ------- features ------- */
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 0;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--rule);
+    grid-gap: 1px;
+  }
+  .feature {
+    background: var(--paper);
+    padding: 24px 22px;
+  }
+  .feature h3 {
+    font-family: "Fraunces", serif;
+    font-size: 19px;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+  .feature h3 .fig {
+    color: var(--accent);
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .feature p {
+    margin: 0;
+    font-size: 16px;
+    color: var(--ink-soft);
+  }
+
+  /* ------- install ------- */
+  .steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+  }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 16px 0 16px 58px;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .steps li:last-child { border-bottom: 0; }
+  .steps li::before {
+    content: counter(step, upper-roman);
+    position: absolute;
+    left: 0;
+    top: 14px;
+    font-family: "Fraunces", serif;
+    font-weight: 640;
+    color: var(--accent);
+    font-size: 19px;
+    width: 44px;
+  }
+  .steps code {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 15.5px;
+    background: var(--paper-deep);
+    border: 1px solid var(--rule);
+    border-radius: 5px;
+    padding: 1px 7px;
+    white-space: nowrap;
+  }
+  .store-note {
+    margin-top: 22px;
+    font-style: italic;
+    color: var(--ink-soft);
+    font-size: 16px;
+  }
+
+  /* ------- footer ------- */
+  footer {
+    margin-top: 110px;
+    padding-top: 26px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 14.5px;
+    color: var(--ink-soft);
+  }
+  footer a { color: var(--accent); }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .section:nth-of-type(2) { animation-delay: 0.2s; }
+
+  @media (max-width: 560px) {
+    body { font-size: 17.5px; }
+    .demo { padding: 22px 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <header class="masthead">
+    <div class="over">The free encyclopedia · one selection away</div>
+    <div class="rulewrap"><img src="icon128.png" alt="WikiLens icon" /></div>
+  </header>
+
+  <section class="entry">
+    <h1>Wiki<span class="dot">·</span>Lens</h1>
+    <p class="pron"><i>/ˈwɪk.i lenz/</i> · <span class="pos">noun, browser extension</span></p>
+    <ol class="senses">
+      <li>A Chromium extension that reveals the Wikipedia article behind any
+        text you select — an image, the opening paragraph, and a link to read
+        on, in a small popup right where you are.</li>
+      <li><em>figurative.</em> The shortest distance between curiosity and
+        knowledge.</li>
+    </ol>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/Ville-Mattila/wikilens">Get it on GitHub</a>
+      <a class="btn btn-ghost" href="#try">Try it right here</a>
+      <span class="cta-note">Free · open source · no tracking</span>
+    </div>
+  </section>
+
+  <section class="section" id="try">
+    <div class="section-head"><span class="no">§ 1</span><h2>Try it on this very page</h2></div>
+    <p class="demo-hint">Select any dotted term below — this demo calls the
+      real Wikipedia API, exactly like the extension does.</p>
+    <div class="demo" id="demo">
+      <p class="dropcap">When <span class="term">Albert Einstein</span> published his theory of
+        relativity, the speed of light became the universe's one fixed rule.
+        Meanwhile, in quieter corners of nature, <span class="term">photosynthesis</span>
+        keeps converting sunlight into life, and the
+        <span class="term">aurora</span> paints the night sky over
+        <span class="term">Helsinki</span>.</p>
+      <p>Every dotted phrase is an exact Wikipedia article title. Select one —
+        or select something that isn't an article, and notice how WikiLens
+        politely stays out of your way.</p>
+      <div class="demo-status" id="demo-status"></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><span class="no">§ 2</span><h2>Character­istics</h2></div>
+    <div class="features">
+      <div class="feature">
+        <h3><span class="fig">fig. a</span>Exact by default</h3>
+        <p>A preview appears only when your selection is precisely an article's
+          title. Prefer looser matching? Flip one switch and redirects like
+          “USA” resolve too.</p>
+      </div>
+      <div class="feature">
+        <h3><span class="fig">fig. b</span>23 languages</h3>
+        <p>Point it at any Wikipedia edition — English, Suomi, Deutsch, 日本語
+          and nineteen more — from the settings page.</p>
+      </div>
+      <div class="feature">
+        <h3><span class="fig">fig. c</span>Yours to shape</h3>
+        <p>Three popup sizes, light and dark themes, and the full first
+          paragraph in a scrollable card.</p>
+      </div>
+      <div class="feature">
+        <h3><span class="fig">fig. d</span>Private by design</h3>
+        <p>Your selection travels to Wikipedia's API and nowhere else. Nothing
+          is stored, logged, or sold. The code is open for inspection.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><span class="no">§ 3</span><h2>Installation</h2></div>
+    <ol class="steps">
+      <li>Download or clone the source from
+        <a href="https://github.com/Ville-Mattila/wikilens">github.com/Ville-Mattila/wikilens</a>.</li>
+      <li>Open <code>chrome://extensions</code> and enable
+        <strong>Developer mode</strong>.</li>
+      <li>Click <strong>Load unpacked</strong> and choose the wikilens folder.</li>
+      <li>Select some text anywhere. That's it.</li>
+    </ol>
+    <p class="store-note">A Chrome Web Store listing is in the works — soon it
+      will be a single click.</p>
+  </section>
+
+  <footer>
+    <span>WikiLens · an open-source Chromium extension</span>
+    <span><a href="https://github.com/Ville-Mattila/wikilens">Source on GitHub</a></span>
+  </footer>
+
+</div>
+
+<script>
+(() => {
+  const demo = document.getElementById("demo");
+  const status = document.getElementById("demo-status");
+  let card = null;
+  let seq = 0;
+  const cache = new Map();
+
+  demo.addEventListener("mouseup", () => setTimeout(onSelect, 10));
+  document.addEventListener("mousedown", (e) => {
+    if (card && !card.contains(e.target)) removeCard();
+  });
+
+  async function onSelect() {
+    const sel = document.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const text = sel.toString().trim();
+    if (!text || text.length > 80 || /[\n\r\t]/.test(text)) return;
+    if (!demo.contains(sel.anchorNode)) return;
+
+    const mySeq = ++seq;
+    status.textContent = "Consulting the encyclopedia…";
+    const data = await lookup(text);
+    if (mySeq !== seq) return;
+
+    if (!data) {
+      status.textContent = `“${text}” is not an exact article title — no popup, by design.`;
+      removeCard();
+      return;
+    }
+    status.textContent = "";
+    showCard(data, sel);
+  }
+
+  async function lookup(title) {
+    const key = title.toLowerCase();
+    if (cache.has(key)) return cache.get(key);
+    let result = null;
+    try {
+      const res = await fetch(
+        "https://en.wikipedia.org/api/rest_v1/page/summary/" +
+        encodeURIComponent(title)
+      );
+      if (res.ok) {
+        const d = await res.json();
+        if (d.type === "standard" &&
+            d.title.toLowerCase() === title.trim().toLowerCase()) {
+          result = {
+            title: d.title,
+            extract: d.extract,
+            thumb: d.thumbnail ? d.thumbnail.source : null,
+            url: d.content_urls.desktop.page,
+          };
+        }
+      }
+    } catch (_) { /* offline etc. — treat as no match */ }
+    cache.set(key, result);
+    return result;
+  }
+
+  function showCard(a, sel) {
+    removeCard();
+    const range = sel.getRangeAt(0).getBoundingClientRect();
+    const host = demo.getBoundingClientRect();
+
+    card = document.createElement("div");
+    card.className = "wl-card";
+    card.innerHTML =
+      (a.thumb ? `<img src="${a.thumb}" alt="">` : "") +
+      `<div class="b"><p class="t"></p><p class="x"></p></div>` +
+      `<div class="f"><a target="_blank" rel="noopener">Read in Wikipedia →</a></div>`;
+    card.querySelector(".t").textContent = a.title;
+    card.querySelector(".x").textContent = a.extract;
+    card.querySelector(".f a").href = a.url;
+
+    demo.appendChild(card);
+    const w = 320;
+    let left = range.left - host.left + range.width / 2 - w / 2;
+    left = Math.max(8, Math.min(left, host.width - w - 8));
+    card.style.left = left + "px";
+    card.style.top = (range.bottom - host.top + 10) + "px";
+  }
+
+  function removeCard() {
+    if (card) { card.remove(); card = null; }
+  }
+})();
+</script>
+</body>
+</html>
