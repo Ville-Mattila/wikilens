@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..900&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="shared.css" />
+<style>
+  .frame {
+    width: 1200px;
+    height: 630px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 96px 0 92px;
+    position: relative;
+    overflow: hidden;
+  }
+  .copy { position: relative; z-index: 2; max-width: 620px; }
+  .kick {
+    font-size: 15px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 22px;
+  }
+  .lockup { display: flex; align-items: center; gap: 22px; }
+  .lockup img { width: 84px; height: 84px; }
+  h1 { font-size: 96px; }
+  h1 .dot { color: var(--accent); }
+  .tag {
+    margin-top: 20px;
+    font-size: 30px;
+    font-style: italic;
+    color: var(--ink-soft);
+    line-height: 1.35;
+  }
+  .meta {
+    margin-top: 30px;
+    font-size: 15px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .stage { position: relative; z-index: 1; flex: none; }
+  .stage .wl-card { transform: rotate(2deg); width: 300px; }
+  .stage .wl-card img.thumb { height: 220px; object-position: 50% 20%; }
+  .ghostline {
+    position: absolute;
+    left: -70px;
+    top: -46px;
+    width: 400px;
+    font-size: 19px;
+    line-height: 1.8;
+    color: #b4ab93;
+    transform: rotate(-2deg);
+  }
+</style>
+</head><body>
+<div class="grain"></div>
+<div class="frame">
+  <div class="copy">
+    <div class="kick">Chromium extension</div>
+    <div class="lockup">
+      <img src="../icons/icon128.png" alt="" />
+      <h1 class="display">Wiki<span class="dot">·</span>Lens</h1>
+    </div>
+    <div class="tag">Select text on any page —<br>get the Wikipedia article, instantly.</div>
+    <div class="meta">Free · Open source · No tracking</div>
+  </div>
+  <div class="stage">
+    <div class="ghostline">…the patent clerk who reshaped
+      physics, <mark>Albert Einstein</mark>, published four papers…</div>
+    <div class="wl-card dark">
+      <img class="thumb" src="einstein.jpg" alt="" />
+      <div class="b">
+        <div class="t">Albert Einstein</div>
+        <div class="x">Albert Einstein was a German-born theoretical physicist
+          best known for developing the theory of relativity…</div>
+      </div>
+      <div class="f">Read in Wikipedia →</div>
+    </div>
+  </div>
+</div>
+</body></html>
