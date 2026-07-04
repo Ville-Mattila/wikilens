@@ -265,7 +265,7 @@
   .wl-card {
     position: absolute;
     z-index: 10;
-    width: 320px;
+    width: 400px;
     max-width: calc(100vw - 40px);
     background: var(--card-bg);
     color: var(--card-text);
@@ -318,15 +318,15 @@
   .wl-card .b { padding: 12px 14px 10px; }
   .wl-card .t {
     font-family: Georgia, serif;
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 700;
     margin: 0 0 6px;
   }
   .wl-card .x {
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.5;
     margin: 0;
-    max-height: 195px;
+    max-height: 290px;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-right: 6px;
@@ -340,7 +340,7 @@
   }
   .wl-card .f a {
     color: var(--card-link);
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     text-decoration: none;
   }
@@ -624,7 +624,7 @@
     card.querySelector(".f a").href = a.url;
 
     demo.appendChild(card);
-    const w = 320;
+    const w = 400;
     let left = range.left - host.left + range.width / 2 - w / 2;
     left = Math.max(8, Math.min(left, host.width - w - 8));
     card.style.left = left + "px";
