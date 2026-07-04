@@ -181,6 +181,17 @@
         padding-top: 1px;
       }
       .facts .fv { min-width: 0; }
+      .facts .fv a {
+        color: inherit;
+        text-decoration: underline;
+        text-decoration-color: ${theme.border};
+        text-underline-offset: 2px;
+        transition: color 0.15s, text-decoration-color 0.15s;
+      }
+      .facts .fv a:hover {
+        color: ${theme.link};
+        text-decoration-color: ${theme.link};
+      }
       @media (prefers-reduced-motion: reduce) {
         .card, .card.out, .thumb, .title, .extract, .facts, .footer { animation: none; }
       }
@@ -264,7 +275,19 @@
         label.textContent = fact.label;
         const value = document.createElement("span");
         value.className = "fv";
-        value.textContent = fact.value;
+        fact.parts.forEach((part, i) => {
+          if (i > 0) value.appendChild(document.createTextNode(", "));
+          if (part.href) {
+            const a = document.createElement("a");
+            a.href = part.href;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            a.textContent = part.text;
+            value.appendChild(a);
+          } else {
+            value.appendChild(document.createTextNode(part.text));
+          }
+        });
         facts.append(label, value);
       }
       card.appendChild(facts);

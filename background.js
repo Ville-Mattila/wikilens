@@ -54,7 +54,7 @@ async function lookupArticle(title) {
   // the Large popup also shows infobox-style quick facts from Wikidata
   const facts =
     size === "large" && data.wikibase_item
-      ? await fetchFacts(data.wikibase_item)
+      ? await fetchFacts(data.wikibase_item, language)
       : [];
 
   return {
@@ -81,7 +81,9 @@ const FACT_PROPS = [
   ["P856", "Website", "url", 1],
 ];
 
-async function fetchFacts(qid) {
+// Facts are returned as { label, parts: [{ text, href? }] } so the popup can
+// render each value segment as a link when one exists.
+async function fetchFacts(qid, language) {
   try {
     // both Wikidata calls are anonymous CORS requests (origin=*), so no
     // extra host permissions are needed
@@ -109,35 +111,54 @@ async function fetchFacts(qid) {
       if (picked.length >= 6) break;
     }
 
-    // item-valued claims (occupation, country, …) hold Q-ids; resolve them
-    // to English labels in one batch request
+    // item-valued claims (occupation, country, …) hold Q-ids; resolve their
+    // English labels and Wikipedia article titles in one batch request, so
+    // each can render as a link to its own article
+    const wiki = `${language}wiki`;
     const labels = {};
+    const articles = {};
     if (itemIds.size) {
       const res2 = await fetch(
         "https://www.wikidata.org/w/api.php?action=wbgetentities" +
-          `&ids=${[...itemIds].join("|")}&props=labels&languages=en` +
-          "&format=json&origin=*"
+          `&ids=${[...itemIds].join("|")}&props=labels%7Csitelinks` +
+          `&languages=en&sitefilter=${wiki}%7Cenwiki&format=json&origin=*`
       );
       if (res2.ok) {
         for (const [id, entity] of Object.entries(
           (await res2.json()).entities ?? {}
         )) {
           labels[id] = entity.labels?.en?.value;
+          const link = entity.sitelinks?.[wiki] ?? entity.sitelinks?.enwiki;
+          if (link) {
+            const host = entity.sitelinks?.[wiki]
+              ? `${language}.wikipedia.org`
+              : "en.wikipedia.org";
+            articles[id] =
+              `https://${host}/wiki/${encodeURIComponent(link.title)}`;
+          }
         }
       }
     }
 
     const facts = [];
     for (const { label, type, values } of picked) {
-      let text = null;
-      if (type === "time") text = formatWikidataTime(values[0]);
-      else if (type === "quantity")
-        text = Number(values[0].amount).toLocaleString("en");
-      else if (type === "url")
-        text = values[0].replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
-      else if (type === "item")
-        text = values.map((v) => labels[v.id]).filter(Boolean).join(", ");
-      if (text) facts.push({ label, value: text });
+      let parts = [];
+      if (type === "time") {
+        const text = formatWikidataTime(values[0]);
+        if (text) parts = [{ text }];
+      } else if (type === "quantity") {
+        parts = [{ text: Number(values[0].amount).toLocaleString("en") }];
+      } else if (type === "url") {
+        const text = values[0]
+          .replace(/^https?:\/\/(www\.)?/, "")
+          .replace(/\/$/, "");
+        parts = [{ text, href: values[0] }];
+      } else if (type === "item") {
+        parts = values
+          .filter((v) => labels[v.id])
+          .map((v) => ({ text: labels[v.id], href: articles[v.id] }));
+      }
+      if (parts.length) facts.push({ label, parts });
       if (facts.length >= 5) break;
     }
     return facts;
