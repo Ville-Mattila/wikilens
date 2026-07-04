@@ -9,7 +9,7 @@ A Chromium extension that shows an instant Wikipedia preview when you select tex
 1. Select any text on a web page (mouse or keyboard).
 2. After a short debounce, the extension asks the Wikipedia REST API whether the selection is an exact article title.
 3. If it is, an animated popup springs up next to the selection with:
-   - the article's image in a square, portrait-friendly crop (faces stay in frame),
+   - the article's image in a square, portrait-friendly crop (faces stay in frame) — and when the article has more images, a small arrow flips through up to five of them,
    - the title and the article's full first paragraph, scrollable when long,
    - on the Large size, up to five quick facts from the article's infobox data — born, died, occupation, founded, population, website and the like — where each linkable value (a country, an occupation, a website) is clickable,
    - a **Read in Wikipedia →** link that opens the full article in a new tab.
@@ -19,12 +19,17 @@ Redirects (e.g. "USA") don't trigger the popup by default — only exact article
 
 The toolbar button opens a small popup with your recent lookups (stored only on your device) and a search box for looking up titles directly.
 
-## Install (unpacked)
+## Install
 
-1. Open `chrome://extensions` in Chrome/Edge/Brave.
-2. Enable **Developer mode** (top right).
-3. Click **Load unpacked** and pick this folder.
-4. Visit any page, select e.g. `Albert Einstein`, and the preview appears.
+**Chrome / Edge / Brave (unpacked):**
+
+1. Open `chrome://extensions`, enable **Developer mode** (top right).
+2. Click **Load unpacked** and pick this folder.
+3. Visit any page, select e.g. `Albert Einstein`, and the preview appears.
+
+**Firefox:** grab `wikilens-firefox-<version>.zip` from the [latest release](https://github.com/Ville-Mattila/wikilens/releases) and load it via `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** (a Firefox Add-ons listing is on its way).
+
+Store listings for the Chrome Web Store and Firefox Add-ons are in review.
 
 ## Settings
 
