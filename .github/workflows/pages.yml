@@ -29,3 +29,9 @@ jobs:
           path: docs
       - id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
+      # GitHub's Pages backend intermittently rejects deployments with a
+      # generic "try again later" — one retry has always been enough
+      - id: retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
