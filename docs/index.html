@@ -624,11 +624,15 @@
     card.querySelector(".f a").href = a.url;
 
     demo.appendChild(card);
-    const w = 400;
+    // scale the card down proportionally when the demo box or viewport is
+    // narrower than the card, so it always fits
+    const scale = Math.min(1, (host.width - 16) / 400, (innerWidth - 24) / 400);
+    if (scale < 1) card.style.zoom = scale;
+    const w = 400 * scale;
     let left = range.left - host.left + range.width / 2 - w / 2;
     left = Math.max(8, Math.min(left, host.width - w - 8));
-    card.style.left = left + "px";
-    card.style.top = (range.bottom - host.top + 10) + "px";
+    card.style.left = left / (scale || 1) + "px";
+    card.style.top = (range.bottom - host.top + 10) / (scale || 1) + "px";
   }
 
   function removeCard(animate = true) {

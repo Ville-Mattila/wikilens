@@ -312,11 +312,17 @@
     popupCard = card;
     document.documentElement.appendChild(popupHost);
 
-    positionPopup(card, rect);
+    // scale the whole card down proportionally when the viewport is
+    // narrower than the card (zoom scales layout without touching the
+    // entrance animation's transform)
+    const baseWidth = (SIZES[settings.size] ?? SIZES.medium).width;
+    const scale = Math.min(1, (window.innerWidth - 24) / baseWidth);
+    if (scale < 1) card.style.zoom = scale;
+
+    positionPopup(card, rect, baseWidth * scale);
   }
 
-  function positionPopup(card, rect) {
-    const cardWidth = (SIZES[settings.size] ?? SIZES.medium).width;
+  function positionPopup(card, rect, cardWidth) {
     const margin = 8;
 
     // horizontal: centered on the selection, clamped to the viewport
