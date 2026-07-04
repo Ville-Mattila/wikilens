@@ -23,16 +23,17 @@ Wikidata identifier. No selected text or personal data is included in these
 requests.
 
 **Settings.** Your preferences (language, popup size, theme, trigger mode,
-matching mode, and your list of disabled sites) are stored using Chrome's
-built-in `chrome.storage.sync`, which may sync them across your own
-signed-in Chrome profiles. Settings never leave Google's Chrome sync
+matching mode, and your list of disabled sites) are stored using your
+browser's built-in extension storage (`storage.sync`), which may sync them
+across your own signed-in browser profiles via your browser vendor's sync
+service (e.g. Firefox Sync or Chrome Sync). Settings never leave that sync
 infrastructure and are not visible to the developer.
 
 **Recent lookups.** The toolbar popup shows your last 10 previewed articles
 (title and Wikipedia URL). This list is stored only on your device using
-`chrome.storage.local` — it is never synced, transmitted, or visible to the
-developer, and clearing the extension's storage (or removing the extension)
-deletes it.
+the browser's local extension storage (`storage.local`) — it is never
+synced, transmitted, or visible to the developer, and clearing the
+extension's storage (or removing the extension) deletes it.
 
 ## What WikiLens does NOT do
 
