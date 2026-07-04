@@ -8,9 +8,9 @@
 
   // textMax: the snippet area scrolls once the paragraph exceeds this height
   const SIZES = {
-    small: { width: 260, textMax: 110, imgHeight: 120, title: 14, text: 12 },
-    medium: { width: 320, textMax: 195, imgHeight: 160, title: 16, text: 13 },
-    large: { width: 400, textMax: 290, imgHeight: 210, title: 18, text: 14 },
+    small: { width: 260, textMax: 110, title: 14, text: 12 },
+    medium: { width: 320, textMax: 195, title: 16, text: 13 },
+    large: { width: 400, textMax: 290, title: 18, text: 14 },
   };
 
   const THEMES = {
@@ -150,8 +150,10 @@
       .thumb {
         display: block;
         width: 100%;
-        max-height: ${size.imgHeight}px;
+        aspect-ratio: 1 / 1;
         object-fit: cover;
+        /* favor the upper part of the image so portrait faces stay in frame */
+        object-position: 50% 20%;
         background: ${theme.thumbBg};
         animation: wl-settle 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards;
       }

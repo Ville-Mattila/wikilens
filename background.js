@@ -41,10 +41,19 @@ async function lookupArticle(title) {
     throw new Error("not an exact title match");
   }
 
+  // The summary thumbnail is ~330px wide; request a larger rendition so the
+  // square popup image stays sharp. Wikimedia only serves a fixed set of
+  // widths (330/500/960...) and rejects widths beyond the original, so use
+  // 500px and only when the original allows it.
+  let thumbnail = data.thumbnail?.source ?? null;
+  if (thumbnail && (data.originalimage?.width ?? 0) > 500) {
+    thumbnail = thumbnail.replace(/\/(\d+)px-/, "/500px-");
+  }
+
   return {
     title: data.title,
     extract: data.extract,
-    thumbnail: data.thumbnail?.source ?? null,
+    thumbnail,
     pageUrl:
       data.content_urls?.desktop?.page ??
       `https://${language}.wikipedia.org/wiki/${encodeURIComponent(title)}`,

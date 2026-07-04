@@ -281,8 +281,9 @@
   .wl-card img {
     display: block;
     width: 100%;
-    max-height: 160px;
+    aspect-ratio: 1 / 1;
     object-fit: cover;
+    object-position: 50% 20%;
     background: #303134;
     animation: wl-settle 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }
@@ -573,10 +574,14 @@
         const d = await res.json();
         if (d.type === "standard" &&
             d.title.toLowerCase() === title.trim().toLowerCase()) {
+          let thumb = d.thumbnail ? d.thumbnail.source : null;
+          if (thumb && d.originalimage && d.originalimage.width > 500) {
+            thumb = thumb.replace(/\/(\d+)px-/, "/500px-");
+          }
           result = {
             title: d.title,
             extract: d.extract,
-            thumb: d.thumbnail ? d.thumbnail.source : null,
+            thumb,
             url: d.content_urls.desktop.page,
           };
         }
