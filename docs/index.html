@@ -58,7 +58,7 @@
   .sheet {
     position: relative;
     z-index: 2;
-    max-width: 780px;
+    max-width: 1000px;
     margin: 0 auto;
     padding: 0 28px 96px;
   }
@@ -300,7 +300,7 @@
   /* ------- features ------- */
   .features {
     display: grid;
-    grid-template-columns: repeat(2, minmax(210px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 0;
     border: 1px solid var(--rule);
     border-radius: 10px;
@@ -310,7 +310,7 @@
   }
   .feature {
     background: var(--paper);
-    padding: 24px 22px;
+    padding: 22px 20px;
   }
   .feature h3 {
     font-family: "Fraunces", serif;
@@ -392,9 +392,13 @@
   }
   .section:nth-of-type(2) { animation-delay: 0.2s; }
 
+  @media (max-width: 900px) {
+    .features { grid-template-columns: repeat(2, 1fr); }
+  }
   @media (max-width: 560px) {
     body { font-size: 17.5px; }
     .demo { padding: 22px 20px; }
+    .features { grid-template-columns: 1fr; }
   }
 </style>
 </head>
