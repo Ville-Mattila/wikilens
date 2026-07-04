@@ -101,3 +101,37 @@ Generated in `store-assets/out/` (see `store-assets/`):
 - `screenshot-1.png`, `screenshot-2.png`, `screenshot-3.png` — 1280×800
 - `promo-small.png` — 440×280 (small promo tile)
 - `promo-marquee.png` — 1400×560 (marquee, optional)
+
+## Other stores
+
+### Microsoft Edge Add-ons
+
+- [ ] Reuses the **same Chrome zip** — no separate build needed
+      (`powershell -File scripts/package.ps1`).
+- [ ] Register a free Partner Center account:
+      https://partner.microsoft.com/dashboard/microsoftedge/overview
+- [ ] Listing fields mirror Chrome's — reuse the same name, summary,
+      detailed description, category, screenshots, and privacy policy URL
+      from this file.
+- [ ] Permission/single-purpose justifications: paste the same text as the
+      Chrome submission; Edge review asks for equivalent disclosures.
+- [ ] Privacy policy URL: same as Chrome —
+      https://github.com/Ville-Mattila/wikilens/blob/main/PRIVACY.md
+
+### Firefox AMO (addons.mozilla.org)
+
+- [ ] Build the Firefox-specific zip:
+      `powershell -File scripts/package.ps1 -Target firefox`
+      → produces `dist/wikilens-firefox-<version>.zip` using
+      `firefox/manifest.json` (background as `scripts`, plus
+      `browser_specific_settings.gecko`).
+- [ ] Submit at https://addons.mozilla.org/developers/
+- [ ] Source code submission is **not required** — there's no build step,
+      the uploaded zip already is the source.
+- [ ] Listing fields mirror Chrome's — reuse the same name, summary,
+      description, and screenshots from this file.
+- [ ] Privacy policy URL: same as Chrome —
+      https://github.com/Ville-Mattila/wikilens/blob/main/PRIVACY.md
+- [ ] Expect an automated review pass first; note the extension only uses
+      `storage` + the wikipedia.org host permission, so it should sail
+      through.

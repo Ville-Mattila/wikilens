@@ -4,6 +4,16 @@
 
 const DEFAULT_LANG = "en";
 
+// Caches both hits and misses for repeated selections (e.g. re-selecting the
+// same non-article phrase). Reset whenever the service worker sleeps/wakes,
+// which is fine — there's no need to persist this across restarts.
+const CACHE_LIMIT = 200;
+const lookupCache = new Map();
+const CACHE_MISS = Symbol("miss"); // marks a cached negative result
+
+// aborts any in-flight lookup fetches when a newer selection supersedes them
+let currentAbort = null;
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type !== "wikilens-lookup") return;
 
@@ -20,52 +30,78 @@ async function lookupArticle(title) {
     exactMatch: true,
     size: "medium",
   });
-  const url =
-    `https://${language}.wikipedia.org/api/rest_v1/page/summary/` +
-    `${encodeURIComponent(title)}`;
 
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-  const data = await res.json();
-  // "standard" = a real article. Excludes disambiguation pages, which have
-  // no useful summary to show regardless of the matching mode.
-  if (data.type !== "standard") throw new Error(`type ${data.type}`);
-
-  // The API resolves redirects server-side even when asked not to
-  // (e.g. "USA" returns the "United States" summary). In exact mode,
-  // require the selected text to actually be the article's title.
-  // Case-insensitive, because MediaWiki titles themselves are
-  // case-normalized ("albert einstein" is a valid way to name the
-  // "Albert Einstein" article).
-  if (exactMatch && data.title.toLowerCase() !== title.trim().toLowerCase()) {
-    throw new Error("not an exact title match");
+  const cacheKey = `${language}|${exactMatch}|${size}|${title.toLowerCase()}`;
+  if (lookupCache.has(cacheKey)) {
+    const cached = lookupCache.get(cacheKey);
+    if (cached === CACHE_MISS) throw new Error("cached miss");
+    return cached;
   }
 
-  // The summary thumbnail is ~330px wide; request a larger rendition so the
-  // square popup image stays sharp. Wikimedia only serves a fixed set of
-  // widths (330/500/960...) and rejects widths beyond the original, so use
-  // 500px and only when the original allows it.
-  let thumbnail = data.thumbnail?.source ?? null;
-  if (thumbnail && (data.originalimage?.width ?? 0) > 500) {
-    thumbnail = thumbnail.replace(/\/(\d+)px-/, "/500px-");
+  currentAbort?.abort();
+  const abort = new AbortController();
+  currentAbort = abort;
+
+  try {
+    const url =
+      `https://${language}.wikipedia.org/api/rest_v1/page/summary/` +
+      `${encodeURIComponent(title)}`;
+
+    const res = await fetch(url, { signal: abort.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const data = await res.json();
+    // "standard" = a real article. Excludes disambiguation pages, which have
+    // no useful summary to show regardless of the matching mode.
+    if (data.type !== "standard") throw new Error(`type ${data.type}`);
+
+    // The API resolves redirects server-side even when asked not to
+    // (e.g. "USA" returns the "United States" summary). In exact mode,
+    // require the selected text to actually be the article's title.
+    // Case-insensitive, because MediaWiki titles themselves are
+    // case-normalized ("albert einstein" is a valid way to name the
+    // "Albert Einstein" article).
+    if (exactMatch && data.title.toLowerCase() !== title.trim().toLowerCase()) {
+      throw new Error("not an exact title match");
+    }
+
+    // The summary thumbnail is ~330px wide; request a larger rendition so the
+    // square popup image stays sharp. Wikimedia only serves a fixed set of
+    // widths (330/500/960...) and rejects widths beyond the original, so use
+    // 500px and only when the original allows it.
+    let thumbnail = data.thumbnail?.source ?? null;
+    if (thumbnail && (data.originalimage?.width ?? 0) > 500) {
+      thumbnail = thumbnail.replace(/\/(\d+)px-/, "/500px-");
+    }
+
+    // the Large popup also shows infobox-style quick facts from Wikidata
+    const facts =
+      size === "large" && data.wikibase_item
+        ? await fetchFacts(data.wikibase_item, language, abort.signal)
+        : [];
+
+    const result = {
+      title: data.title,
+      extract: data.extract,
+      thumbnail,
+      facts,
+      pageUrl:
+        data.content_urls?.desktop?.page ??
+        `https://${language}.wikipedia.org/wiki/${encodeURIComponent(title)}`,
+    };
+    cacheSet(cacheKey, result);
+    return result;
+  } catch (err) {
+    if (err?.name !== "AbortError") cacheSet(cacheKey, CACHE_MISS);
+    throw err;
   }
+}
 
-  // the Large popup also shows infobox-style quick facts from Wikidata
-  const facts =
-    size === "large" && data.wikibase_item
-      ? await fetchFacts(data.wikibase_item, language)
-      : [];
-
-  return {
-    title: data.title,
-    extract: data.extract,
-    thumbnail,
-    facts,
-    pageUrl:
-      data.content_urls?.desktop?.page ??
-      `https://${language}.wikipedia.org/wiki/${encodeURIComponent(title)}`,
-  };
+function cacheSet(key, value) {
+  if (lookupCache.size >= CACHE_LIMIT) {
+    lookupCache.delete(lookupCache.keys().next().value); // evict oldest
+  }
+  lookupCache.set(key, value);
 }
 
 // [property id, display label, value type, max values to join]
@@ -83,13 +119,14 @@ const FACT_PROPS = [
 
 // Facts are returned as { label, parts: [{ text, href? }] } so the popup can
 // render each value segment as a link when one exists.
-async function fetchFacts(qid, language) {
+async function fetchFacts(qid, language, signal) {
   try {
     // both Wikidata calls are anonymous CORS requests (origin=*), so no
     // extra host permissions are needed
     const res = await fetch(
       "https://www.wikidata.org/w/api.php?action=wbgetentities" +
-        `&ids=${qid}&props=claims&format=json&origin=*`
+        `&ids=${qid}&props=claims&format=json&origin=*`,
+      { signal }
     );
     if (!res.ok) return [];
     const claims = (await res.json()).entities?.[qid]?.claims;
@@ -121,7 +158,8 @@ async function fetchFacts(qid, language) {
       const res2 = await fetch(
         "https://www.wikidata.org/w/api.php?action=wbgetentities" +
           `&ids=${[...itemIds].join("|")}&props=labels%7Csitelinks` +
-          `&languages=en&sitefilter=${wiki}%7Cenwiki&format=json&origin=*`
+          `&languages=en&sitefilter=${wiki}%7Cenwiki&format=json&origin=*`,
+        { signal }
       );
       if (res2.ok) {
         for (const [id, entity] of Object.entries(
@@ -162,8 +200,12 @@ async function fetchFacts(qid, language) {
       if (facts.length >= 5) break;
     }
     return facts;
-  } catch {
-    return []; // facts are a bonus — never block the popup on them
+  } catch (err) {
+    // facts are a bonus and never block the popup on them — except an abort,
+    // which means a newer lookup superseded this one and must propagate up
+    // so lookupArticle doesn't cache an incomplete result under a stale key.
+    if (err?.name === "AbortError") throw err;
+    return [];
   }
 }
 

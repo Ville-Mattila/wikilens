@@ -60,6 +60,9 @@
     const sel = document.getSelection();
     if (popupHost && (!sel || sel.isCollapsed)) removePopup();
   });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && popupHost) removePopup();
+  });
 
   function scheduleLookup(event) {
     if (popupHost && event.composedPath?.().includes(popupHost)) return;
@@ -68,6 +71,7 @@
   }
 
   function runLookup() {
+    if (isEditableContext()) return;
     const text = getSelectedTitle();
     if (!text) return;
 
@@ -82,6 +86,22 @@
         showPopup(response.data);
       }
     );
+  }
+
+  function isEditableContext() {
+    const active = document.activeElement;
+    if (active) {
+      const tag = active.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || active.isContentEditable) {
+        return true;
+      }
+    }
+    const sel = document.getSelection();
+    const anchor = sel?.anchorNode;
+    if (!anchor) return false;
+    // anchorNode may be a text node; closest() needs an element
+    const el = anchor.nodeType === Node.ELEMENT_NODE ? anchor : anchor.parentElement;
+    return !!el?.closest?.('input, textarea, [contenteditable]:not([contenteditable="false"])');
   }
 
   function getSelectedTitle() {

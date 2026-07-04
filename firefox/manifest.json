@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "WikiLens",
+  "version": "1.1.0",
+  "description": "Select text on any page to instantly preview the matching Wikipedia article with an image and snippet.",
+  "homepage_url": "https://ville-mattila.github.io/wikilens/",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    },
+    "default_title": "WikiLens — right-click for settings"
+  },
+  "permissions": ["storage"],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "exclude_matches": ["https://*.wikipedia.org/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": ["https://*.wikipedia.org/*"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "wikilens@ville-mattila.github.io",
+      "strict_min_version": "121.0"
+    }
+  }
+}
