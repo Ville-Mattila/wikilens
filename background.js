@@ -147,21 +147,58 @@ async function lookupInLanguage(title, lang, { exactMatch, size, signal }) {
     thumbnail = thumbnail.replace(/\/(\d+)px-/, "/500px-");
   }
 
-  // the Large popup also shows infobox-style quick facts from Wikidata
-  const facts =
+  // the Large popup also shows infobox-style quick facts from Wikidata;
+  // gallery images feed the popup's image carousel — fetch both in parallel
+  const [facts, images] = await Promise.all([
     size === "large" && data.wikibase_item
-      ? await fetchFacts(data.wikibase_item, lang, signal)
-      : [];
+      ? fetchFacts(data.wikibase_item, lang, signal)
+      : [],
+    fetchImages(data.title, lang, thumbnail, signal),
+  ]);
 
   return {
     title: data.title,
     extract: data.extract,
     thumbnail,
+    images,
     facts,
     pageUrl:
       data.content_urls?.desktop?.page ??
       `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title)}`,
   };
+}
+
+// Collects up to 5 image URLs for the popup's carousel: the sharp summary
+// thumbnail first, then the article's gallery images from the media-list
+// endpoint (icons and decorations are excluded via showInGallery). Best
+// effort — any failure falls back to just the lead thumbnail.
+async function fetchImages(title, lang, leadThumbnail, signal) {
+  const lead = leadThumbnail ? [leadThumbnail] : [];
+  try {
+    const res = await fetch(
+      `https://${lang}.wikipedia.org/api/rest_v1/page/media-list/` +
+        encodeURIComponent(title),
+      { signal }
+    );
+    if (!res.ok) return lead;
+    const items = (await res.json()).items ?? [];
+    const extra = [];
+    for (const item of items) {
+      if (item.type !== "image" || !item.showInGallery) continue;
+      // the lead image is already represented by the sharper thumbnail
+      if (item.leadImage) continue;
+      // last srcset entry is the highest-resolution rendition Wikimedia
+      // itself offers, so it's always a valid width
+      const src = item.srcset?.[item.srcset.length - 1]?.src;
+      if (!src) continue;
+      extra.push(src.startsWith("//") ? "https:" + src : src);
+      if (extra.length >= 4) break;
+    }
+    return [...lead, ...extra].slice(0, 5);
+  } catch (err) {
+    if (err?.name === "AbortError") throw err;
+    return lead;
+  }
 }
 
 // Fetches up to 8 outgoing article links (namespace 0) for a disambiguation

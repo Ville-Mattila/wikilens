@@ -204,6 +204,10 @@
         from { transform: scale(1.1); }
         to   { transform: scale(1); }
       }
+      .thumbwrap {
+        position: relative;
+        overflow: hidden;
+      }
       .thumb {
         display: block;
         width: 100%;
@@ -213,6 +217,42 @@
         object-position: 50% 20%;
         background: ${theme.thumbBg};
         animation: wl-settle 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+        transition: opacity 0.16s ease;
+      }
+      .thumb.fade { opacity: 0; }
+      .imgnav {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 30px;
+        height: 30px;
+        border: none;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.45);
+        color: #fff;
+        font-size: 18px;
+        line-height: 28px;
+        text-align: center;
+        padding: 0;
+        cursor: pointer;
+        transition: background 0.15s, transform 0.15s;
+      }
+      .imgnav:hover {
+        background: rgba(0, 0, 0, 0.7);
+        transform: translateY(-50%) scale(1.08);
+      }
+      .imgcount {
+        position: absolute;
+        right: 8px;
+        bottom: 8px;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.45);
+        color: #fff;
+        pointer-events: none;
       }
       .title { animation: wl-rise 0.38s 0.1s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
       .extract { animation: wl-rise 0.38s 0.17s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
@@ -370,12 +410,50 @@
     const card = document.createElement("div");
     card.className = "card";
 
-    if (article.thumbnail) {
+    const images = article.images?.length
+      ? article.images
+      : article.thumbnail
+        ? [article.thumbnail]
+        : [];
+    if (images.length) {
+      const wrap = document.createElement("div");
+      wrap.className = "thumbwrap";
       const img = document.createElement("img");
       img.className = "thumb";
-      img.src = article.thumbnail;
+      img.src = images[0];
       img.alt = article.title;
-      card.appendChild(img);
+      wrap.appendChild(img);
+
+      if (images.length > 1) {
+        let index = 0;
+        const counter = document.createElement("span");
+        counter.className = "imgcount";
+        counter.textContent = `1 / ${images.length}`;
+
+        const next = document.createElement("button");
+        next.type = "button";
+        next.className = "imgnav";
+        next.textContent = "›";
+        next.title = "Next image";
+        // preserve the text selection, same as the disambiguation options —
+        // otherwise the selectionchange handler dismisses the popup
+        next.addEventListener("mousedown", (e) => e.preventDefault());
+        next.addEventListener("click", () => {
+          index = (index + 1) % images.length;
+          counter.textContent = `${index + 1} / ${images.length}`;
+          img.classList.add("fade");
+          setTimeout(() => {
+            img.src = images[index];
+            img.onload = () => img.classList.remove("fade");
+          }, 160);
+          // warm the cache for the frame after this one
+          new Image().src = images[(index + 1) % images.length];
+        });
+
+        wrap.append(next, counter);
+        new Image().src = images[1]; // first click should be instant
+      }
+      card.appendChild(wrap);
     }
 
     const body = document.createElement("div");
