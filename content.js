@@ -33,14 +33,26 @@
     },
   };
 
-  let settings = { size: "medium", theme: "dark" };
+  let settings = {
+    size: "medium",
+    theme: "dark",
+    trigger: "select",
+    disabledSites: [],
+  };
   chrome.storage.sync.get(settings, (stored) => {
-    settings = { size: stored.size, theme: stored.theme };
+    settings = {
+      size: stored.size,
+      theme: stored.theme,
+      trigger: stored.trigger,
+      disabledSites: stored.disabledSites,
+    };
   });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "sync") return;
     if (changes.size) settings.size = changes.size.newValue;
     if (changes.theme) settings.theme = changes.theme.newValue;
+    if (changes.trigger) settings.trigger = changes.trigger.newValue;
+    if (changes.disabledSites) settings.disabledSites = changes.disabledSites.newValue;
   });
 
   let popupHost = null;
@@ -66,12 +78,14 @@
 
   function scheduleLookup(event) {
     if (popupHost && event.composedPath?.().includes(popupHost)) return;
+    if (settings.trigger === "alt" && !event.altKey) return;
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(runLookup, DEBOUNCE_MS);
   }
 
   function runLookup() {
     if (isEditableContext()) return;
+    if (isDisabledSite()) return;
     const text = getSelectedTitle();
     if (!text) return;
 
@@ -85,6 +99,20 @@
         if (getSelectedTitle() !== text) return; // selection changed meanwhile
         showPopup(response.data);
       }
+    );
+  }
+
+  function resolveThemeName() {
+    if (settings.theme === "auto") {
+      return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    return settings.theme;
+  }
+
+  function isDisabledSite() {
+    const host = location.hostname.toLowerCase();
+    return settings.disabledSites.some(
+      (entry) => host === entry || host.endsWith("." + entry)
     );
   }
 
@@ -132,7 +160,7 @@
     const shadow = popupHost.attachShadow({ mode: "closed" });
 
     const size = SIZES[settings.size] ?? SIZES.medium;
-    const theme = THEMES[settings.theme] ?? THEMES.dark;
+    const theme = THEMES[resolveThemeName()] ?? THEMES.dark;
 
     const style = document.createElement("style");
     style.textContent = `

@@ -29,12 +29,16 @@ const DEFAULTS = {
   size: "medium",
   theme: "dark",
   exactMatch: true,
+  trigger: "select",
+  disabledSites: [],
 };
 
 const languageSelect = document.getElementById("language");
 const exactMatchInput = document.getElementById("exactMatch");
+const disabledSitesInput = document.getElementById("disabledSites");
 const statusEl = document.getElementById("status");
 let statusTimer = null;
+let disabledSitesTimer = null;
 
 for (const [code, label] of LANGUAGES) {
   const option = document.createElement("option");
@@ -46,8 +50,10 @@ for (const [code, label] of LANGUAGES) {
 chrome.storage.sync.get(DEFAULTS, (settings) => {
   languageSelect.value = settings.language;
   exactMatchInput.checked = settings.exactMatch;
+  disabledSitesInput.value = settings.disabledSites.join("\n");
   checkRadio("size", settings.size);
   checkRadio("theme", settings.theme);
+  checkRadio("trigger", settings.trigger);
 });
 
 languageSelect.addEventListener("change", () =>
@@ -58,10 +64,30 @@ exactMatchInput.addEventListener("change", () =>
   save({ exactMatch: exactMatchInput.checked })
 );
 
-for (const name of ["size", "theme"]) {
+disabledSitesInput.addEventListener("input", () => {
+  clearTimeout(disabledSitesTimer);
+  disabledSitesTimer = setTimeout(() => {
+    save({ disabledSites: parseDisabledSites(disabledSitesInput.value) });
+  }, 500);
+});
+
+for (const name of ["size", "theme", "trigger"]) {
   document.getElementById(name).addEventListener("change", (e) => {
     if (e.target.name === name) save({ [name]: e.target.value });
   });
+}
+
+function parseDisabledSites(raw) {
+  const hosts = [];
+  for (const line of raw.split("\n")) {
+    let host = line.trim();
+    if (!host) continue;
+    host = host.toLowerCase();
+    host = host.replace(/^[a-z][a-z0-9+.-]*:\/\//, ""); // strip protocol, e.g. https://
+    host = host.split(/[/?#]/)[0]; // strip path/query/hash if a full URL was pasted
+    if (host) hosts.push(host);
+  }
+  return hosts;
 }
 
 function checkRadio(name, value) {

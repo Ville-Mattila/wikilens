@@ -63,6 +63,19 @@
       background: #303134;
       color: #e8eaed;
     }
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      border-radius: 6px;
+      border: 1px solid #5f6368;
+      background: #303134;
+      color: #e8eaed;
+      resize: vertical;
+    }
     .segmented {
       display: flex;
       border: 1px solid #5f6368;
@@ -185,7 +198,19 @@
     <div class="segmented" id="theme">
       <label><input type="radio" name="theme" value="light" /><span>☀️ Light</span></label>
       <label><input type="radio" name="theme" value="dark" /><span>🌙 Dark</span></label>
+      <label><input type="radio" name="theme" value="auto" /><span>Auto</span></label>
     </div>
+  </div>
+
+  <div class="field">
+    <span class="label">Trigger</span>
+    <div class="segmented" id="trigger">
+      <label><input type="radio" name="trigger" value="select" /><span>On select</span></label>
+      <label><input type="radio" name="trigger" value="alt" /><span>Alt + select</span></label>
+    </div>
+    <p class="hint">
+      Alt + select keeps popups away until you ask for them.
+    </p>
   </div>
 
   <div class="field">
@@ -200,6 +225,15 @@
       When on, the preview appears only if the selection is exactly an
       article's title. Turn off to also follow Wikipedia redirects, e.g.
       "USA" → "United States".
+    </p>
+  </div>
+
+  <div class="field">
+    <label for="disabledSites">Disabled sites</label>
+    <textarea id="disabledSites" rows="4" spellcheck="false"></textarea>
+    <p class="hint">
+      WikiLens stays quiet on these sites. One hostname per line, e.g.
+      docs.google.com — subdomains are included.
     </p>
   </div>
 
