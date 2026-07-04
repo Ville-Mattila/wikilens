@@ -31,7 +31,21 @@ if ($Target -eq "firefox") {
     $zip = Join-Path $distDir "wikilens-$version.zip"
 }
 if (Test-Path $zip) { Remove-Item $zip -Force }
-Compress-Archive -Path (Join-Path $staging "*") -DestinationPath $zip
+# Compress-Archive writes backslash entry names on Windows, which violates
+# the ZIP spec and is rejected by Mozilla's AMO validator - build the
+# archive manually with forward-slash entries instead.
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$archive = [System.IO.Compression.ZipFile]::Open($zip, "Create")
+try {
+    Get-ChildItem $staging -Recurse -File | ForEach-Object {
+        $rel = $_.FullName.Substring($staging.Length + 1) -replace "\\", "/"
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+            $archive, $_.FullName, $rel) | Out-Null
+    }
+} finally {
+    $archive.Dispose()
+}
 Remove-Item $staging -Recurse -Force
 
 Write-Host "Created $zip"
