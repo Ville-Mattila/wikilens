@@ -43,6 +43,7 @@
   });
 
   let popupHost = null;
+  let popupCard = null; // direct reference; the shadow root is closed
   let debounceTimer = null;
   let requestSeq = 0; // guards against out-of-order async responses
 
@@ -100,7 +101,7 @@
   }
 
   function showPopup(article) {
-    removePopup();
+    removePopup(false); // replace instantly, no exit animation overlap
     const rect = selectionRect();
     if (!rect) return;
 
@@ -125,11 +126,26 @@
         border-radius: 8px;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
         overflow: hidden;
-        animation: wikilens-in 0.15s ease-out;
+        transform-origin: 50% 0;
+        animation: wl-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
       }
-      @keyframes wikilens-in {
-        from { opacity: 0; transform: translateY(4px); }
+      .card.out {
+        animation: wl-out 0.18s ease-in forwards;
+      }
+      @keyframes wl-pop {
+        from { opacity: 0; transform: translateY(14px) scale(0.92); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      @keyframes wl-out {
+        to { opacity: 0; transform: translateY(8px) scale(0.96); }
+      }
+      @keyframes wl-rise {
+        from { opacity: 0; transform: translateY(7px); }
         to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes wl-settle {
+        from { transform: scale(1.1); }
+        to   { transform: scale(1); }
       }
       .thumb {
         display: block;
@@ -137,6 +153,13 @@
         max-height: ${size.imgHeight}px;
         object-fit: cover;
         background: ${theme.thumbBg};
+        animation: wl-settle 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+      }
+      .title { animation: wl-rise 0.38s 0.1s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+      .extract { animation: wl-rise 0.38s 0.17s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+      .footer { animation: wl-rise 0.38s 0.24s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+      @media (prefers-reduced-motion: reduce) {
+        .card, .card.out, .thumb, .title, .extract, .footer { animation: none; }
       }
       .body { padding: 12px 14px 10px; }
       .title {
@@ -179,6 +202,11 @@
         cursor: pointer;
       }
       .link:hover { text-decoration: underline; }
+      .link .arr {
+        display: inline-block;
+        transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .link:hover .arr { transform: translateX(4px); }
     `;
     shadow.appendChild(style);
 
@@ -211,11 +239,16 @@
     link.href = article.pageUrl;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.textContent = "Read in Wikipedia →";
+    link.textContent = "Read in Wikipedia ";
+    const arr = document.createElement("span");
+    arr.className = "arr";
+    arr.textContent = "→";
+    link.appendChild(arr);
     footer.appendChild(link);
     card.appendChild(footer);
 
     shadow.appendChild(card);
+    popupCard = card;
     document.documentElement.appendChild(popupHost);
 
     positionPopup(card, rect);
@@ -243,10 +276,17 @@
     popupHost.style.top = `${top + window.scrollY}px`;
   }
 
-  function removePopup() {
-    if (popupHost) {
-      popupHost.remove();
-      popupHost = null;
+  function removePopup(animate = true) {
+    if (!popupHost) return;
+    const host = popupHost;
+    const card = popupCard;
+    popupHost = null;
+    popupCard = null;
+    if (animate && card && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      card.classList.add("out");
+      setTimeout(() => host.remove(), 190);
+    } else {
+      host.remove();
     }
   }
 })();

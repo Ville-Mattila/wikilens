@@ -259,11 +259,24 @@
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    animation: cardin 0.15s ease-out;
+    transform-origin: 50% 0;
+    animation: wl-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
   }
-  @keyframes cardin {
-    from { opacity: 0; transform: translateY(4px); }
+  .wl-card.out { animation: wl-out 0.18s ease-in forwards; }
+  @keyframes wl-pop {
+    from { opacity: 0; transform: translateY(14px) scale(0.92); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes wl-out {
+    to { opacity: 0; transform: translateY(8px) scale(0.96); }
+  }
+  @keyframes wl-rise {
+    from { opacity: 0; transform: translateY(7px); }
     to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes wl-settle {
+    from { transform: scale(1.1); }
+    to   { transform: scale(1); }
   }
   .wl-card img {
     display: block;
@@ -271,6 +284,20 @@
     max-height: 160px;
     object-fit: cover;
     background: #303134;
+    animation: wl-settle 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .wl-card .t { animation: wl-rise 0.38s 0.1s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+  .wl-card .x { animation: wl-rise 0.38s 0.17s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+  .wl-card .f { animation: wl-rise 0.38s 0.24s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+  .wl-card .f .arr {
+    display: inline-block;
+    transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .wl-card .f a:hover .arr { transform: translateX(4px); }
+  @media (prefers-reduced-motion: reduce) {
+    .wl-card, .wl-card.out, .wl-card img, .wl-card .t, .wl-card .x, .wl-card .f {
+      animation: none;
+    }
   }
   .wl-card .b { padding: 12px 14px 10px; }
   .wl-card .t {
@@ -560,7 +587,7 @@
   }
 
   function showCard(a, sel) {
-    removeCard();
+    removeCard(false); // replace instantly, no exit animation overlap
     const range = sel.getRangeAt(0).getBoundingClientRect();
     const host = demo.getBoundingClientRect();
 
@@ -569,7 +596,7 @@
     card.innerHTML =
       (a.thumb ? `<img src="${a.thumb}" alt="">` : "") +
       `<div class="b"><p class="t"></p><p class="x"></p></div>` +
-      `<div class="f"><a target="_blank" rel="noopener">Read in Wikipedia →</a></div>`;
+      `<div class="f"><a target="_blank" rel="noopener">Read in Wikipedia <span class="arr">→</span></a></div>`;
     card.querySelector(".t").textContent = a.title;
     card.querySelector(".x").textContent = a.extract;
     card.querySelector(".f a").href = a.url;
@@ -582,8 +609,16 @@
     card.style.top = (range.bottom - host.top + 10) + "px";
   }
 
-  function removeCard() {
-    if (card) { card.remove(); card = null; }
+  function removeCard(animate = true) {
+    if (!card) return;
+    const el = card;
+    card = null;
+    if (animate && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      el.classList.add("out");
+      setTimeout(() => el.remove(), 190);
+    } else {
+      el.remove();
+    }
   }
 })();
 </script>
