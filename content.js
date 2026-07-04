@@ -6,10 +6,11 @@
   const MAX_TITLE_LENGTH = 80;
   const DEBOUNCE_MS = 250;
 
-  // textMax: the snippet area scrolls once the paragraph exceeds this height
+  // textMax: the snippet area scrolls once the paragraph exceeds this height.
+  // Medium and Large share dimensions; Large additionally shows quick facts.
   const SIZES = {
     small: { width: 260, textMax: 110, title: 14, text: 12 },
-    medium: { width: 320, textMax: 195, title: 16, text: 13 },
+    medium: { width: 400, textMax: 290, title: 18, text: 14 },
     large: { width: 400, textMax: 290, title: 18, text: 14 },
   };
 
@@ -159,9 +160,29 @@
       }
       .title { animation: wl-rise 0.38s 0.1s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
       .extract { animation: wl-rise 0.38s 0.17s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
-      .footer { animation: wl-rise 0.38s 0.24s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+      .facts { animation: wl-rise 0.38s 0.24s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+      .footer { animation: wl-rise 0.38s 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+      .facts {
+        border-top: 1px solid ${theme.divider};
+        padding: 10px 14px 12px;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        column-gap: 14px;
+        row-gap: 4px;
+        font-size: ${size.text - 1}px;
+        line-height: 1.45;
+      }
+      .facts .fl {
+        color: ${theme.link};
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: ${size.text - 3}px;
+        letter-spacing: 0.05em;
+        padding-top: 1px;
+      }
+      .facts .fv { min-width: 0; }
       @media (prefers-reduced-motion: reduce) {
-        .card, .card.out, .thumb, .title, .extract, .footer { animation: none; }
+        .card, .card.out, .thumb, .title, .extract, .facts, .footer { animation: none; }
       }
       .body { padding: 12px 14px 10px; }
       .title {
@@ -233,6 +254,21 @@
     extract.textContent = article.extract;
     body.append(title, extract);
     card.appendChild(body);
+
+    if (article.facts?.length) {
+      const facts = document.createElement("div");
+      facts.className = "facts";
+      for (const fact of article.facts) {
+        const label = document.createElement("span");
+        label.className = "fl";
+        label.textContent = fact.label;
+        const value = document.createElement("span");
+        value.className = "fv";
+        value.textContent = fact.value;
+        facts.append(label, value);
+      }
+      card.appendChild(facts);
+    }
 
     const footer = document.createElement("div");
     footer.className = "footer";
