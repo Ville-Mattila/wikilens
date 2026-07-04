@@ -37,27 +37,34 @@ user selects on a web page.
 
 ## Permission justifications
 
-**Host permission `https://*.wikipedia.org/*`:**
-Required to query the Wikipedia REST API (`/api/rest_v1/page/summary/`) from
-the extension's service worker to look up the user's selected text and fetch
-the article summary and thumbnail. The wildcard subdomain is needed because
-each Wikipedia language edition lives on its own subdomain (en.wikipedia.org,
-fi.wikipedia.org, …) and the user chooses the language in settings.
+Paste these verbatim — both are under the dashboard's 1000-character limit.
 
-**Content script on `<all_urls>` (broad host access):**
-The extension's single purpose is to react to text selection on whatever page
-the user is reading. This requires a content script on all pages: it listens
-for selection events and renders the preview popup next to the selection. The
-script activates only on an explicit user gesture (selecting text), reads
-only the selected text, and sends it only to the Wikipedia API. `activeTab`
-is not a viable alternative because it would require clicking the extension
-icon before every lookup, defeating the select-and-see purpose. No page
-content other than the current selection is read, and nothing is written to
-pages except the extension's own popup element.
+**Host permission justification (991 chars):**
 
-**`storage`:**
-Stores the user's preferences (Wikipedia language, popup size, theme,
-matching mode) via chrome.storage.sync.
+> WikiLens has a single purpose: when the user selects text on a page, it
+> shows a preview of the matching Wikipedia article. Broad host access is
+> required for both halves of this: (1) A content script must run on all
+> pages to listen for the user's text-selection gesture and render the
+> preview popup next to the selection. It activates only on an explicit
+> selection, reads only the selected text, and injects nothing except the
+> extension's own popup. activeTab is not viable, as it would require
+> clicking the toolbar icon before every lookup, defeating the select-and-see
+> purpose. (2) Access to https://*.wikipedia.org/* lets the service worker
+> query the Wikipedia REST API (/api/rest_v1/page/summary/) to check the
+> selected text against article titles and fetch the summary and thumbnail.
+> The subdomain wildcard is needed because each language edition the user can
+> choose in settings lives on its own subdomain (en.wikipedia.org,
+> fi.wikipedia.org, etc.). No other data is read or transmitted.
+
+**storage justification (452 chars):**
+
+> The storage permission saves the user's preferences via
+> chrome.storage.sync: Wikipedia language edition, popup size
+> (small/medium/large), light or dark theme, and the exact-title matching
+> mode. These settings are read by the service worker and content script to
+> render previews the way the user configured, and sync across the user's own
+> Chrome profiles. No user data, browsing data, or selected text is ever
+> stored - only these four preference values.
 
 ## Privacy practices tab answers
 
