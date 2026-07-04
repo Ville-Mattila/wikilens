@@ -56,7 +56,7 @@
   });
 
   let popupHost = null;
-  let popupCard = null; // direct reference; the shadow root is closed
+  let popupCard = null; // direct reference to the current card element
   let debounceTimer = null;
   let requestSeq = 0; // guards against out-of-order async responses
 
@@ -165,7 +165,9 @@
     popupHost = document.createElement("div");
     popupHost.style.cssText =
       "position:absolute;z-index:2147483647;width:0;height:0;";
-    const shadow = popupHost.attachShadow({ mode: "closed" });
+    // "open" so other extensions (hover-zoom tools etc.) can see the popup's
+    // contents via composedPath()/shadowRoot; style isolation is unaffected
+    const shadow = popupHost.attachShadow({ mode: "open" });
 
     const size = SIZES[settings.size] ?? SIZES.medium;
     const theme = THEMES[resolveThemeName()] ?? THEMES.dark;
