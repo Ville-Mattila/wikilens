@@ -42,59 +42,128 @@ async function lookupArticle(title) {
   const abort = new AbortController();
   currentAbort = abort;
 
+  // Try the user's language first; if it's not English and the lookup fails
+  // for a "not found" reason (404, exact-title mismatch, disambiguation-less
+  // non-standard type), retry the identical logic against English once
+  // before giving up. AbortErrors (superseded lookups) must propagate
+  // immediately rather than trigger a fallback attempt.
+  const languages = language === "en" ? [language] : [language, "en"];
+
   try {
-    const url =
-      `https://${language}.wikipedia.org/api/rest_v1/page/summary/` +
-      `${encodeURIComponent(title)}`;
-
-    const res = await fetch(url, { signal: abort.signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    const data = await res.json();
-    // "standard" = a real article. Excludes disambiguation pages, which have
-    // no useful summary to show regardless of the matching mode.
-    if (data.type !== "standard") throw new Error(`type ${data.type}`);
-
-    // The API resolves redirects server-side even when asked not to
-    // (e.g. "USA" returns the "United States" summary). In exact mode,
-    // require the selected text to actually be the article's title.
-    // Case-insensitive, because MediaWiki titles themselves are
-    // case-normalized ("albert einstein" is a valid way to name the
-    // "Albert Einstein" article).
-    if (exactMatch && data.title.toLowerCase() !== title.trim().toLowerCase()) {
-      throw new Error("not an exact title match");
+    let lastErr;
+    for (let i = 0; i < languages.length; i++) {
+      const lang = languages[i];
+      try {
+        const result = await lookupInLanguage(title, lang, {
+          exactMatch,
+          size,
+          signal: abort.signal,
+        });
+        cacheSet(cacheKey, result);
+        return result;
+      } catch (err) {
+        if (err?.name === "AbortError") throw err;
+        // lookupInLanguage only ever throws for "not found" reasons (404,
+        // non-standard type, exact-title mismatch, or a failed
+        // disambiguation-links fetch), so it's always safe to fall through
+        // to the next language here.
+        lastErr = err;
+      }
     }
-
-    // The summary thumbnail is ~330px wide; request a larger rendition so the
-    // square popup image stays sharp. Wikimedia only serves a fixed set of
-    // widths (330/500/960...) and rejects widths beyond the original, so use
-    // 500px and only when the original allows it.
-    let thumbnail = data.thumbnail?.source ?? null;
-    if (thumbnail && (data.originalimage?.width ?? 0) > 500) {
-      thumbnail = thumbnail.replace(/\/(\d+)px-/, "/500px-");
-    }
-
-    // the Large popup also shows infobox-style quick facts from Wikidata
-    const facts =
-      size === "large" && data.wikibase_item
-        ? await fetchFacts(data.wikibase_item, language, abort.signal)
-        : [];
-
-    const result = {
-      title: data.title,
-      extract: data.extract,
-      thumbnail,
-      facts,
-      pageUrl:
-        data.content_urls?.desktop?.page ??
-        `https://${language}.wikipedia.org/wiki/${encodeURIComponent(title)}`,
-    };
-    cacheSet(cacheKey, result);
-    return result;
+    throw lastErr;
   } catch (err) {
     if (err?.name !== "AbortError") cacheSet(cacheKey, CACHE_MISS);
     throw err;
   }
+}
+
+// Performs the lookup against a single Wikipedia language edition. Returns
+// either a normal article result or a disambiguation result. Throws on any
+// "not found" condition (404, non-standard type, exact-title mismatch) so
+// the caller can decide whether to fall back to another language.
+async function lookupInLanguage(title, lang, { exactMatch, size, signal }) {
+  const url =
+    `https://${lang}.wikipedia.org/api/rest_v1/page/summary/` +
+    `${encodeURIComponent(title)}`;
+
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  const data = await res.json();
+
+  if (data.type === "disambiguation") {
+    return lookupDisambiguation(data, lang, signal);
+  }
+
+  // "standard" = a real article.
+  if (data.type !== "standard") throw new Error(`type ${data.type}`);
+
+  // The API resolves redirects server-side even when asked not to
+  // (e.g. "USA" returns the "United States" summary). In exact mode,
+  // require the selected text to actually be the article's title.
+  // Case-insensitive, because MediaWiki titles themselves are
+  // case-normalized ("albert einstein" is a valid way to name the
+  // "Albert Einstein" article).
+  if (exactMatch && data.title.toLowerCase() !== title.trim().toLowerCase()) {
+    throw new Error("not an exact title match");
+  }
+
+  // The summary thumbnail is ~330px wide; request a larger rendition so the
+  // square popup image stays sharp. Wikimedia only serves a fixed set of
+  // widths (330/500/960...) and rejects widths beyond the original, so use
+  // 500px and only when the original allows it.
+  let thumbnail = data.thumbnail?.source ?? null;
+  if (thumbnail && (data.originalimage?.width ?? 0) > 500) {
+    thumbnail = thumbnail.replace(/\/(\d+)px-/, "/500px-");
+  }
+
+  // the Large popup also shows infobox-style quick facts from Wikidata
+  const facts =
+    size === "large" && data.wikibase_item
+      ? await fetchFacts(data.wikibase_item, lang, signal)
+      : [];
+
+  return {
+    title: data.title,
+    extract: data.extract,
+    thumbnail,
+    facts,
+    pageUrl:
+      data.content_urls?.desktop?.page ??
+      `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title)}`,
+  };
+}
+
+// Fetches up to 8 outgoing article links (namespace 0) for a disambiguation
+// page, so the popup can offer them as quick picks. If the links fetch
+// fails, throw so the whole lookup is treated as a miss (current behavior).
+async function lookupDisambiguation(data, lang, signal) {
+  const url =
+    `https://${lang}.wikipedia.org/w/api.php?action=query` +
+    `&titles=${encodeURIComponent(data.title)}` +
+    "&prop=links&plnamespace=0&pllimit=12&format=json&origin=*";
+
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  const json = await res.json();
+  const pages = json.query?.pages;
+  if (!pages) throw new Error("no disambiguation links");
+
+  const page = Object.values(pages)[0];
+  const links = page?.links;
+  if (!links || !links.length) throw new Error("no disambiguation links");
+
+  const options = links.slice(0, 8).map((l) => l.title);
+
+  return {
+    disambiguation: true,
+    title: data.title,
+    options,
+    pageUrl:
+      data.content_urls?.desktop?.page ??
+      `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(data.title)}`,
+  };
 }
 
 function cacheSet(key, value) {

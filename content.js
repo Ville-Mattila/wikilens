@@ -150,9 +150,17 @@
   }
 
   function showPopup(article) {
-    removePopup(false); // replace instantly, no exit animation overlap
     const rect = selectionRect();
     if (!rect) return;
+    renderPopup(article, { rect });
+  }
+
+  // Renders a popup either anchored to the current selection rect, or at a
+  // fixed page position (left/top, already including scroll offset) — used
+  // when replacing a disambiguation card with an article card after an
+  // option click, at which point the original selection may be gone.
+  function renderPopup(article, position) {
+    removePopup(false); // replace instantly, no exit animation overlap
 
     popupHost = document.createElement("div");
     popupHost.style.cssText =
@@ -289,9 +297,76 @@
         transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
       }
       .link:hover .arr { transform: translateX(4px); }
+      .subtitle {
+        font-size: ${size.text - 1}px;
+        color: ${theme.text};
+        opacity: 0.7;
+        margin: 0 0 8px;
+      }
+      .options {
+        border-top: 1px solid ${theme.divider};
+        padding: 6px;
+        max-height: ${size.textMax + 40}px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+        scrollbar-color: ${theme.border} transparent;
+      }
+      .options::-webkit-scrollbar { width: 6px; }
+      .options::-webkit-scrollbar-thumb {
+        background: ${theme.border};
+        border-radius: 3px;
+      }
+      .options::-webkit-scrollbar-track { background: transparent; }
+      .option {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        text-align: left;
+        font: inherit;
+        font-size: ${size.text}px;
+        color: ${theme.text};
+        background: none;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 8px;
+        margin: 0;
+        cursor: pointer;
+        transition: background-color 0.15s;
+      }
+      .option:hover, .option:focus-visible {
+        background: ${theme.divider};
+        outline: none;
+      }
     `;
     shadow.appendChild(style);
 
+    const card = article.disambiguation
+      ? buildDisambiguationCard(article)
+      : buildArticleCard(article);
+
+    shadow.appendChild(card);
+    popupCard = card;
+    document.documentElement.appendChild(popupHost);
+
+    // scale the whole card down proportionally when the viewport is
+    // narrower than the card (zoom scales layout without touching the
+    // entrance animation's transform)
+    const baseWidth = (SIZES[settings.size] ?? SIZES.medium).width;
+    const scale = Math.min(1, (window.innerWidth - 24) / baseWidth);
+    if (scale < 1) card.style.zoom = scale;
+
+    if (position.rect) {
+      positionPopup(card, position.rect, baseWidth * scale);
+    } else {
+      popupHost.style.left = `${position.left}px`;
+      popupHost.style.top = `${position.top}px`;
+    }
+  }
+
+  // Builds the normal article card: image, title, extract, optional facts
+  // grid, and a footer link to the source page.
+  function buildArticleCard(article) {
     const card = document.createElement("div");
     card.className = "card";
 
@@ -341,11 +416,50 @@
       card.appendChild(facts);
     }
 
+    card.appendChild(buildFooter(article.pageUrl));
+    return card;
+  }
+
+  // Builds the disambiguation variant: header + subtitle, a list of
+  // tappable option rows, and a footer that still links to the
+  // disambiguation page itself. No image, no facts.
+  function buildDisambiguationCard(article) {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const body = document.createElement("div");
+    body.className = "body";
+    const title = document.createElement("p");
+    title.className = "title";
+    title.textContent = article.title;
+    const subtitle = document.createElement("p");
+    subtitle.className = "subtitle";
+    subtitle.textContent = "may refer to:";
+    body.append(title, subtitle);
+    card.appendChild(body);
+
+    const options = document.createElement("div");
+    options.className = "options";
+    for (const optionTitle of article.options) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "option";
+      btn.textContent = optionTitle;
+      btn.addEventListener("click", () => selectDisambiguationOption(optionTitle));
+      options.appendChild(btn);
+    }
+    card.appendChild(options);
+
+    card.appendChild(buildFooter(article.pageUrl));
+    return card;
+  }
+
+  function buildFooter(pageUrl) {
     const footer = document.createElement("div");
     footer.className = "footer";
     const link = document.createElement("a");
     link.className = "link";
-    link.href = article.pageUrl;
+    link.href = pageUrl;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     link.textContent = "Read in Wikipedia ";
@@ -354,20 +468,28 @@
     arr.textContent = "→";
     link.appendChild(arr);
     footer.appendChild(link);
-    card.appendChild(footer);
+    return footer;
+  }
 
-    shadow.appendChild(card);
-    popupCard = card;
-    document.documentElement.appendChild(popupHost);
+  // Clicking a disambiguation option looks up that title directly. The
+  // current popup position (which may no longer correspond to any live
+  // text selection) is captured first so the replacement article card can
+  // be placed in the same spot. On failure the list is left as-is.
+  function selectDisambiguationOption(optionTitle) {
+    if (!popupHost) return;
+    const left = parseFloat(popupHost.style.left) || 0;
+    const top = parseFloat(popupHost.style.top) || 0;
 
-    // scale the whole card down proportionally when the viewport is
-    // narrower than the card (zoom scales layout without touching the
-    // entrance animation's transform)
-    const baseWidth = (SIZES[settings.size] ?? SIZES.medium).width;
-    const scale = Math.min(1, (window.innerWidth - 24) / baseWidth);
-    if (scale < 1) card.style.zoom = scale;
-
-    positionPopup(card, rect, baseWidth * scale);
+    const seq = ++requestSeq;
+    chrome.runtime.sendMessage(
+      { type: "wikilens-lookup", title: optionTitle },
+      (response) => {
+        if (chrome.runtime.lastError) return;
+        if (seq !== requestSeq) return;
+        if (!response?.ok) return;
+        renderPopup(response.data, { left, top });
+      }
+    );
   }
 
   function positionPopup(card, rect, cardWidth) {
