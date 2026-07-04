@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..900&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="shared.css" />
+<style>
+  .frame {
+    width: 1280px;
+    height: 800px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 100px 0 84px;
+  }
+  .copy { width: 500px; }
+  .copy h1 { font-size: 72px; margin: 18px 0 26px; }
+  .copy p { font-size: 22px; line-height: 1.55; color: var(--ink-soft); }
+  .copy p b { color: var(--ink); font-weight: 600; }
+  .privacy {
+    margin-top: 36px;
+    border-top: 1px solid var(--rule);
+    padding-top: 22px;
+    font-size: 18px;
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+  .stage { position: relative; width: 520px; height: 620px; }
+  .sheet2 {
+    position: absolute;
+    inset: 0 0 auto 0;
+    background: #fbf7ee;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 44px 48px 200px;
+    box-shadow: 0 24px 60px rgba(33, 31, 26, 0.16);
+    font-size: 20px;
+    line-height: 1.75;
+    color: #3a372f;
+  }
+  .popup-wrap { position: absolute; left: 90px; top: 218px; }
+</style>
+</head><body>
+<div class="grain"></div>
+<div class="frame">
+  <div class="copy">
+    <div class="kicker">No noise, no surprises</div>
+    <h1 class="display">Exact by<br><span class="accent">default.</span></h1>
+    <p>A preview appears only when your selection is <b>precisely an
+      article's title</b> — never guessing, never covering your page with
+      false matches. Prefer looser lookups? One switch also resolves
+      redirects like “USA” → “United States”.</p>
+    <div class="privacy">Private by design: your selection travels to
+      Wikipedia's API and nowhere else. No analytics, no tracking.
+      Open source.</div>
+  </div>
+  <div class="stage">
+    <div class="sheet2">
+      <p>Our summer itinerary begins in <mark>Helsinki</mark>, where the
+      ferries glide past the sea-fortress islands toward the old market
+      square…</p>
+    </div>
+    <div class="popup-wrap">
+      <div class="wl-card light">
+        <img class="thumb" src="helsinki.jpg" alt="" />
+        <div class="b">
+          <div class="t">Helsinki</div>
+          <div class="x">Helsinki is the capital and most populous city in
+            Finland. It is on the shore of the Gulf of Finland and is the
+            seat of southern Finland's Uusimaa region. About 690,000 people
+            live in the municipality…</div>
+        </div>
+        <div class="f">Read in Wikipedia →</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,96 @@
+# Chrome Web Store submission notes
+
+Everything needed to fill in the Developer Dashboard forms.
+
+## Listing
+
+**Name:** WikiLens
+
+**Summary (132 chars max):**
+Select any text to instantly preview the matching Wikipedia article — image,
+first paragraph, and a link to read more.
+
+**Category:** Productivity → Tools
+
+**Detailed description:**
+
+> WikiLens turns every page into an encyclopedia. Select any text — if it's
+> the exact title of a Wikipedia article, a small popup appears right where
+> you are, with the article's image, its full first paragraph, and a link to
+> read the rest on Wikipedia.
+>
+> — Exact by default: previews appear only when your selection is precisely
+> an article title, so the popup never gets in your way. Prefer looser
+> matching? One switch also resolves redirects like "USA" → "United States".
+> — 23 languages: point WikiLens at any major Wikipedia edition.
+> — Yours to shape: three popup sizes, light and dark themes.
+> — Private by design: your selection travels to Wikipedia's API and nowhere
+> else. No analytics, no tracking, no accounts. Open source.
+
+**Homepage:** https://github.com/Ville-Mattila/wikilens
+**Privacy policy URL:** https://github.com/Ville-Mattila/wikilens/blob/main/PRIVACY.md
+
+## Single purpose description
+
+WikiLens has one purpose: showing a Wikipedia article preview for text the
+user selects on a web page.
+
+## Permission justifications
+
+**Host permission `https://*.wikipedia.org/*`:**
+Required to query the Wikipedia REST API (`/api/rest_v1/page/summary/`) from
+the extension's service worker to look up the user's selected text and fetch
+the article summary and thumbnail. The wildcard subdomain is needed because
+each Wikipedia language edition lives on its own subdomain (en.wikipedia.org,
+fi.wikipedia.org, …) and the user chooses the language in settings.
+
+**Content script on `<all_urls>` (broad host access):**
+The extension's single purpose is to react to text selection on whatever page
+the user is reading. This requires a content script on all pages: it listens
+for selection events and renders the preview popup next to the selection. The
+script activates only on an explicit user gesture (selecting text), reads
+only the selected text, and sends it only to the Wikipedia API. `activeTab`
+is not a viable alternative because it would require clicking the extension
+icon before every lookup, defeating the select-and-see purpose. No page
+content other than the current selection is read, and nothing is written to
+pages except the extension's own popup element.
+
+**`storage`:**
+Stores the user's preferences (Wikipedia language, popup size, theme,
+matching mode) via chrome.storage.sync.
+
+## Privacy practices tab answers
+
+- Single purpose: yes (see above).
+- Data usage → what user data do you collect?
+  - **Website content** (the user's selected text) — transmitted to the
+    Wikipedia API solely to look up the matching article. Not collected or
+    stored by the developer.
+  - Everything else (personally identifiable info, health, financial,
+    authentication, communications, location, web history, user activity):
+    **not collected**.
+- Data is NOT sold to third parties: certify.
+- Data is NOT used or transferred for purposes unrelated to the single
+  purpose: certify.
+- Data is NOT used or transferred to determine creditworthiness or for
+  lending purposes: certify.
+- Limited Use policy: compliant.
+
+## Packaging
+
+Create the upload ZIP with only the runtime files:
+
+```powershell
+powershell -File scripts/package.ps1
+```
+
+Produces `dist/wikilens-<version>.zip` containing manifest.json, background.js,
+content.js, options.html, options.js, and icons/.
+
+## Store assets
+
+Generated in `store-assets/out/` (see `store-assets/`):
+
+- `screenshot-1.png`, `screenshot-2.png`, `screenshot-3.png` — 1280×800
+- `promo-small.png` — 440×280 (small promo tile)
+- `promo-marquee.png` — 1400×560 (marquee, optional)

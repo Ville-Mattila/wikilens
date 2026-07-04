@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..900&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="shared.css" />
+<style>
+  .frame {
+    width: 440px;
+    height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+  }
+  .rules {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 300px;
+    margin-bottom: 14px;
+  }
+  .rules::before, .rules::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--rule);
+    box-shadow: 0 3px 0 -2px var(--rule);
+  }
+  .rules img { width: 56px; height: 56px; }
+  h1 { font-size: 52px; }
+  h1 .dot { color: var(--accent); }
+  .tag {
+    margin-top: 8px;
+    font-size: 15px;
+    font-style: italic;
+    color: var(--ink-soft);
+  }
+</style>
+</head><body>
+<div class="grain"></div>
+<div class="frame">
+  <div class="rules"><img src="../icons/icon128.png" alt="" /></div>
+  <h1 class="display">Wiki<span class="dot">·</span>Lens</h1>
+  <div class="tag">The free encyclopedia, one selection away.</div>
+</div>
+</body></html>
