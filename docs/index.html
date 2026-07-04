@@ -181,6 +181,12 @@
     margin-top: 96px;
     animation: rise 0.7s ease-out both;
   }
+  /* the demo's popup must paint above later sections, whose load
+     animation leaves them as sibling stacking contexts */
+  #try {
+    position: relative;
+    z-index: 20;
+  }
   .section-head {
     display: flex;
     align-items: baseline;
