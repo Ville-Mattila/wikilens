@@ -15,6 +15,13 @@ article summary. This is the extension's sole purpose and the only data that
 ever leaves your browser. The request goes directly from your browser to
 Wikipedia — there are no intermediary servers.
 
+**Article identifier (Large popup size only).** When the popup size is set to
+Large, WikiLens additionally requests the matched article's public facts
+(such as birth date or population) from the Wikidata API (`wikidata.org`,
+also operated by the Wikimedia Foundation), using the article's public
+Wikidata identifier. No selected text or personal data is included in these
+requests.
+
 **Settings.** Your preferences (language, popup size, theme, matching mode)
 are stored using Chrome's built-in `chrome.storage.sync`, which may sync them
 across your own signed-in Chrome profiles. Settings never leave Google's
