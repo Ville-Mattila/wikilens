@@ -65,10 +65,28 @@
     // catch keyboard selections (shift+arrows, ctrl+a on a paragraph, etc.)
     if (e.shiftKey || e.key === "Shift") scheduleLookup(e);
   });
+  // True while a pointer interaction (click, drag, text selection) is in
+  // progress inside the popup. Pressing the mouse there collapses the page's
+  // selection, which would otherwise trip the selectionchange dismissal
+  // below — making text inside the popup impossible to select.
+  let popupPointerDown = false;
+
   document.addEventListener("mousedown", (e) => {
-    if (popupHost && !e.composedPath().includes(popupHost)) removePopup();
+    if (popupHost && e.composedPath().includes(popupHost)) {
+      popupPointerDown = true;
+      return;
+    }
+    popupPointerDown = false;
+    if (popupHost) removePopup();
+  });
+  document.addEventListener("mouseup", () => {
+    // let the selection settle before re-arming the dismissal
+    setTimeout(() => {
+      popupPointerDown = false;
+    }, 80);
   });
   document.addEventListener("selectionchange", () => {
+    if (popupPointerDown) return;
     const sel = document.getSelection();
     if (popupHost && (!sel || sel.isCollapsed)) removePopup();
   });
