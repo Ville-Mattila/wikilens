@@ -51,3 +51,7 @@ Every Wikipedia article links a Wikidata entity. For the Large popup, the servic
 - `firefox/manifest.json` — the Firefox (AMO) manifest variant; build with `scripts/package.ps1 -Target firefox`.
 - `docs/` — the landing page served by GitHub Pages.
 - `store-assets/`, `STORE.md`, `PRIVACY.md`, `scripts/package.ps1` — Chrome Web Store submission materials.
+
+## License
+
+WikiLens is free software, released under the [GNU General Public License v3.0](LICENSE).
