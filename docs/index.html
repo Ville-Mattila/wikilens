@@ -304,14 +304,46 @@
   }
   .wl-card .t { animation: wl-rise 0.38s 0.1s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
   .wl-card .x { animation: wl-rise 0.38s 0.17s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
-  .wl-card .f { animation: wl-rise 0.38s 0.24s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+  .wl-card .facts { animation: wl-rise 0.38s 0.24s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+  .wl-card .f { animation: wl-rise 0.38s 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+  .wl-card .facts {
+    border-top: 1px solid var(--card-divider);
+    padding: 10px 14px 12px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 14px;
+    row-gap: 4px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .wl-card .facts .fl {
+    color: var(--card-link);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    padding-top: 1px;
+  }
+  .wl-card .facts .fv { min-width: 0; }
+  .wl-card .facts .fv a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--card-border);
+    text-underline-offset: 2px;
+    transition: color 0.15s, text-decoration-color 0.15s;
+  }
+  .wl-card .facts .fv a:hover {
+    color: var(--card-link);
+    text-decoration-color: var(--card-link);
+  }
   .wl-card .f .arr {
     display: inline-block;
     transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
   }
   .wl-card .f a:hover .arr { transform: translateX(4px); }
   @media (prefers-reduced-motion: reduce) {
-    .wl-card, .wl-card.out, .wl-card img, .wl-card .t, .wl-card .x, .wl-card .f {
+    .wl-card, .wl-card.out, .wl-card img, .wl-card .t, .wl-card .x,
+    .wl-card .facts, .wl-card .f {
       animation: none;
     }
   }
@@ -480,7 +512,8 @@
   <section class="section" id="try">
     <div class="section-head"><span class="no">§ 1</span><h2>Try it on this very page</h2></div>
     <p class="demo-hint">Select any dotted term below — this demo calls the
-      real Wikipedia API, exactly like the extension does.</p>
+      real Wikipedia and Wikidata APIs, exactly like the extension does.
+      Shown at the Large size, quick facts included.</p>
     <div class="demo" id="demo">
       <p class="dropcap">When <span class="term">Albert Einstein</span> published his theory of
         relativity, the speed of light became the universe's one fixed rule.
@@ -600,12 +633,107 @@
             extract: d.extract,
             thumb,
             url: d.content_urls.desktop.page,
+            facts: d.wikibase_item ? await fetchFacts(d.wikibase_item) : [],
           };
         }
       }
     } catch (_) { /* offline etc. — treat as no match */ }
     cache.set(key, result);
     return result;
+  }
+
+  // Quick facts from Wikidata — the same pipeline the extension's Large
+  // popup uses. Facts are best-effort; failures yield an empty list.
+  const FACT_PROPS = [
+    ["P569", "Born", "time", 1],
+    ["P570", "Died", "time", 1],
+    ["P106", "Occupation", "item", 3],
+    ["P27", "Nationality", "item", 2],
+    ["P571", "Founded", "time", 1],
+    ["P17", "Country", "item", 1],
+    ["P36", "Capital", "item", 1],
+    ["P1082", "Population", "quantity", 1],
+    ["P856", "Website", "url", 1],
+  ];
+  const MONTHS = ["January","February","March","April","May","June","July",
+    "August","September","October","November","December"];
+
+  function formatTime(v) {
+    const m = v.time.match(/^([+-])(\d+)-(\d\d)-(\d\d)/);
+    if (!m) return null;
+    const y = Number(m[2]) * (m[1] === "-" ? -1 : 1);
+    const yt = y < 0 ? (-y) + " BC" : String(y);
+    if (v.precision >= 11) return Number(m[4]) + " " + MONTHS[Number(m[3]) - 1] + " " + yt;
+    if (v.precision === 10) return MONTHS[Number(m[3]) - 1] + " " + yt;
+    return yt;
+  }
+
+  async function fetchFacts(qid) {
+    try {
+      const res = await fetch(
+        "https://www.wikidata.org/w/api.php?action=wbgetentities&ids=" + qid +
+        "&props=claims&format=json&origin=*"
+      );
+      if (!res.ok) return [];
+      const claims = (await res.json()).entities?.[qid]?.claims;
+      if (!claims) return [];
+
+      const picked = [];
+      const itemIds = new Set();
+      for (const [pid, label, type, max] of FACT_PROPS) {
+        const sts = (claims[pid] ?? []).filter(s => s.mainsnak?.snaktype === "value");
+        if (!sts.length) continue;
+        const pref = sts.filter(s => s.rank === "preferred");
+        const values = (pref.length ? pref : sts).slice(0, max)
+          .map(s => s.mainsnak.datavalue.value);
+        picked.push({ label, type, values });
+        if (type === "item") values.forEach(v => itemIds.add(v.id));
+        if (picked.length >= 6) break;
+      }
+
+      const labels = {};
+      const articles = {};
+      if (itemIds.size) {
+        const res2 = await fetch(
+          "https://www.wikidata.org/w/api.php?action=wbgetentities&ids=" +
+          [...itemIds].join("|") +
+          "&props=labels%7Csitelinks&languages=en&sitefilter=enwiki&format=json&origin=*"
+        );
+        if (res2.ok) {
+          for (const [id, e] of Object.entries((await res2.json()).entities ?? {})) {
+            labels[id] = e.labels?.en?.value;
+            if (e.sitelinks?.enwiki) {
+              articles[id] = "https://en.wikipedia.org/wiki/" +
+                encodeURIComponent(e.sitelinks.enwiki.title);
+            }
+          }
+        }
+      }
+
+      const facts = [];
+      for (const { label, type, values } of picked) {
+        let parts = [];
+        if (type === "time") {
+          const text = formatTime(values[0]);
+          if (text) parts = [{ text }];
+        } else if (type === "quantity") {
+          parts = [{ text: Number(values[0].amount).toLocaleString("en") }];
+        } else if (type === "url") {
+          parts = [{
+            text: values[0].replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""),
+            href: values[0],
+          }];
+        } else if (type === "item") {
+          parts = values.filter(v => labels[v.id])
+            .map(v => ({ text: labels[v.id], href: articles[v.id] }));
+        }
+        if (parts.length) facts.push({ label, parts });
+        if (facts.length >= 5) break;
+      }
+      return facts;
+    } catch (_) {
+      return [];
+    }
   }
 
   function showCard(a, sel) {
@@ -622,6 +750,33 @@
     card.querySelector(".t").textContent = a.title;
     card.querySelector(".x").textContent = a.extract;
     card.querySelector(".f a").href = a.url;
+
+    if (a.facts && a.facts.length) {
+      const facts = document.createElement("div");
+      facts.className = "facts";
+      for (const fact of a.facts) {
+        const label = document.createElement("span");
+        label.className = "fl";
+        label.textContent = fact.label;
+        const value = document.createElement("span");
+        value.className = "fv";
+        fact.parts.forEach((part, i) => {
+          if (i > 0) value.appendChild(document.createTextNode(", "));
+          if (part.href) {
+            const link = document.createElement("a");
+            link.href = part.href;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = part.text;
+            value.appendChild(link);
+          } else {
+            value.appendChild(document.createTextNode(part.text));
+          }
+        });
+        facts.append(label, value);
+      }
+      card.insertBefore(facts, card.querySelector(".f"));
+    }
 
     demo.appendChild(card);
     // scale the card down proportionally when the demo box or viewport is
