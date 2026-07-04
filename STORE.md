@@ -27,7 +27,7 @@ first paragraph, and a link to read more.
 > — Private by design: your selection travels to Wikipedia's API and nowhere
 > else. No analytics, no tracking, no accounts. Open source.
 
-**Homepage:** https://github.com/Ville-Mattila/wikilens
+**Homepage:** https://ville-mattila.github.io/wikilens/
 **Privacy policy URL:** https://github.com/Ville-Mattila/wikilens/blob/main/PRIVACY.md
 
 ## Single purpose description

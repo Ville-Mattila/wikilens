@@ -2,6 +2,8 @@
 
 A Chromium extension that shows an instant Wikipedia preview when you select text on any page — but only when the selected text is the exact title of an existing Wikipedia article.
 
+**Landing page & live demo:** https://ville-mattila.github.io/wikilens/
+
 ## How it works
 
 1. Select any text on a web page (mouse or keyboard).

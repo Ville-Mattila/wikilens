@@ -3,7 +3,7 @@
   "name": "WikiLens",
   "version": "1.0.0",
   "description": "Select text on any page to instantly preview the matching Wikipedia article with an image and snippet.",
-  "homepage_url": "https://github.com/Ville-Mattila/wikilens",
+  "homepage_url": "https://ville-mattila.github.io/wikilens/",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
