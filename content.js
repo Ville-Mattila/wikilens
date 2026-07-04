@@ -6,10 +6,11 @@
   const MAX_TITLE_LENGTH = 80;
   const DEBOUNCE_MS = 250;
 
+  // textMax: the snippet area scrolls once the paragraph exceeds this height
   const SIZES = {
-    small: { width: 260, lines: 6, imgHeight: 120, title: 14, text: 12 },
-    medium: { width: 320, lines: 10, imgHeight: 160, title: 16, text: 13 },
-    large: { width: 400, lines: 14, imgHeight: 210, title: 18, text: 14 },
+    small: { width: 260, textMax: 110, imgHeight: 120, title: 14, text: 12 },
+    medium: { width: 320, textMax: 195, imgHeight: 160, title: 16, text: 13 },
+    large: { width: 400, textMax: 290, imgHeight: 210, title: 18, text: 14 },
   };
 
   const THEMES = {
@@ -148,10 +149,22 @@
         font-size: ${size.text}px;
         line-height: 1.5;
         margin: 0;
-        display: -webkit-box;
-        -webkit-line-clamp: ${size.lines};
-        -webkit-box-orient: vertical;
-        overflow: hidden;
+        max-height: ${size.textMax}px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-right: 6px;
+        scrollbar-width: thin;
+        scrollbar-color: ${theme.border} transparent;
+      }
+      .extract::-webkit-scrollbar {
+        width: 6px;
+      }
+      .extract::-webkit-scrollbar-thumb {
+        background: ${theme.border};
+        border-radius: 3px;
+      }
+      .extract::-webkit-scrollbar-track {
+        background: transparent;
       }
       .footer {
         border-top: 1px solid ${theme.divider};
