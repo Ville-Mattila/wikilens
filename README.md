@@ -21,13 +21,14 @@ The toolbar button opens a small popup with your recent lookups (stored only on 
 
 ## Install
 
-**Chrome / Edge / Brave (unpacked):**
+**Chrome / Edge / Brave / Vivaldi (unpacked):**
 
-1. Open `chrome://extensions`, enable **Developer mode** (top right).
-2. Click **Load unpacked** and pick this folder.
-3. Visit any page, select e.g. `Albert Einstein`, and the preview appears.
+1. Download `wikilens-<version>.zip` from the [latest release](https://github.com/Ville-Mattila/wikilens/releases) and unzip it into a folder — or clone this repository, which works as-is.
+2. Open `chrome://extensions`, enable **Developer mode** (top right).
+3. Click **Load unpacked** and pick that folder.
+4. Visit any page, select e.g. `Albert Einstein`, and the preview appears.
 
-**Firefox:** grab `wikilens-firefox-<version>.zip` from the [latest release](https://github.com/Ville-Mattila/wikilens/releases) and load it via `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** (a Firefox Add-ons listing is on its way).
+**Firefox:** download `wikilens-firefox-<version>.zip` from the [latest release](https://github.com/Ville-Mattila/wikilens/releases) (no need to unzip) and load it via `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** (a Firefox Add-ons listing is on its way).
 
 Store listings for the Chrome Web Store and Firefox Add-ons are in review.
 
