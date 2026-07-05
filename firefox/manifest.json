@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WikiLens",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Select text on any page to instantly preview the matching Wikipedia article with an image and snippet.",
   "homepage_url": "https://ville-mattila.github.io/wikilens/",
   "icons": {
