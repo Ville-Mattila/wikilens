@@ -121,10 +121,22 @@
   }
 
   function resolveThemeName() {
+    // Dark Reader recolors the popup and mangles our dark palette (its
+    // shadow-root handling ignores darkreader-lock). Cooperate instead:
+    // hand it the light theme, which it converts into a coherent dark
+    // card — in dynamic mode and filter (invert) mode alike.
+    if (isDarkReaderActive()) return "light";
     if (settings.theme === "auto") {
       return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     }
     return settings.theme;
+  }
+
+  function isDarkReaderActive() {
+    return (
+      document.documentElement.hasAttribute("data-darkreader-mode") ||
+      !!document.querySelector("style.darkreader, meta[name='darkreader']")
+    );
   }
 
   function isDisabledSite() {
@@ -186,13 +198,6 @@
     // "open" so other extensions (hover-zoom tools etc.) can see the popup's
     // contents via composedPath()/shadowRoot; style isolation is unaffected
     const shadow = popupHost.attachShadow({ mode: "open" });
-
-    // Dark Reader honors this marker inside a shadow root and skips
-    // recoloring it — the popup already themes itself (light/dark/auto),
-    // and Dark Reader's repaint was washing it out for its users
-    const lock = document.createElement("meta");
-    lock.name = "darkreader-lock";
-    shadow.appendChild(lock);
 
     const size = SIZES[settings.size] ?? SIZES.medium;
     const theme = THEMES[resolveThemeName()] ?? THEMES.dark;
