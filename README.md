@@ -1,6 +1,6 @@
 # WikiLens
 
-A Chromium extension that shows an instant Wikipedia preview when you select text on any page — but only when the selected text is the exact title of an existing Wikipedia article.
+A browser extension (Chromium and Firefox) that shows an instant Wikipedia preview when you select text on any page — but only when the selected text is the exact title of an existing Wikipedia article.
 
 **Landing page & live demo:** https://ville-mattila.github.io/wikilens/
 
@@ -9,7 +9,7 @@ A Chromium extension that shows an instant Wikipedia preview when you select tex
 1. Select any text on a web page (mouse or keyboard).
 2. After a short debounce, the extension asks the Wikipedia REST API whether the selection is an exact article title.
 3. If it is, an animated popup springs up next to the selection with:
-   - the article's image in a square, portrait-friendly crop (faces stay in frame) — and when the article has more images, a small arrow flips through up to five of them,
+   - the article's image, shown whole at its natural aspect ratio — and when the article has more images, a small arrow flips through up to five of them,
    - the title and the article's full first paragraph, scrollable when long,
    - on the Large size, up to five quick facts from the article's infobox data — born, died, occupation, founded, population, website and the like — where each linkable value (a country, an occupation, a website) is clickable,
    - a **Read in Wikipedia →** link that opens the full article in a new tab.
@@ -33,7 +33,7 @@ Store listings for the Chrome Web Store and Firefox Add-ons are in review.
 
 ## Settings
 
-Right-click the WikiLens icon → **Options** (opens in its own tab). Settings sync via `chrome.storage.sync` and apply immediately — no reload needed:
+Click the gear in the toolbar popup, or right-click the WikiLens icon → **Options** (opens in its own tab). Settings sync via `chrome.storage.sync` and apply immediately — no reload needed:
 
 - **Wikipedia language** — which Wikipedia edition to search, from 23 choices (default: English). Also used for quick-fact links; English is tried as a fallback.
 - **Popup size** — Small, Medium, or Large. Small is compact; Medium and Large share roomier dimensions, and Large additionally shows the quick facts block.
@@ -55,7 +55,7 @@ Every Wikipedia article links a Wikidata entity. For the Large popup, the servic
 - `action.html` / `action.js` — the toolbar popup (recent lookups + title search).
 - `firefox/manifest.json` — the Firefox (AMO) manifest variant; build with `scripts/package.ps1 -Target firefox`.
 - `docs/` — the landing page served by GitHub Pages.
-- `store-assets/`, `STORE.md`, `PRIVACY.md`, `scripts/package.ps1` — Chrome Web Store submission materials.
+- `store-assets/`, `STORE.md`, `PRIVACY.md`, `scripts/package.ps1` — store submission materials and packaging (Chrome Web Store, Edge Add-ons, Firefox AMO).
 
 ## License
 
