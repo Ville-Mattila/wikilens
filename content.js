@@ -121,11 +121,6 @@
   }
 
   function resolveThemeName() {
-    // Dark Reader recolors the popup and mangles our dark palette (its
-    // shadow-root handling ignores darkreader-lock). Cooperate instead:
-    // hand it the light theme, which it converts into a coherent dark
-    // card — in dynamic mode and filter (invert) mode alike.
-    if (isDarkReaderActive()) return "light";
     if (settings.theme === "auto") {
       return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     }
@@ -137,6 +132,43 @@
       document.documentElement.hasAttribute("data-darkreader-mode") ||
       !!document.querySelector("style.darkreader, meta[name='darkreader']")
     );
+  }
+
+  // Dark Reader mangles the popup: it half-recolors our shadow content
+  // (light text on our light background) and ignores darkreader-lock in
+  // shadow roots. Two-layer defense: (1) remove any stylesheet it injects
+  // into our shadow root, now and on every later attempt; (2) pin the
+  // palette as inline !important declarations, which outrank stylesheet
+  // !important rules in the cascade — nothing injected can override them.
+  function hardenAgainstRecoloring(shadow, card, theme) {
+    const strip = () =>
+      shadow.querySelectorAll("style.darkreader").forEach((s) => s.remove());
+    strip();
+    new MutationObserver(strip).observe(shadow, { childList: true });
+
+    const pin = (el, props) => {
+      for (const [prop, value] of Object.entries(props)) {
+        el.style.setProperty(prop, value, "important");
+      }
+    };
+    pin(card, {
+      background: theme.bg,
+      color: theme.text,
+      "border-color": theme.border,
+    });
+    const pinAll = (selector, props) =>
+      card.querySelectorAll(selector).forEach((el) => pin(el, props));
+    pinAll(".thumb", { background: theme.thumbBg });
+    pinAll(".title, .extract, .subtitle, .option, .facts .fv", {
+      color: theme.text,
+    });
+    pinAll(".facts, .footer", { "border-color": theme.divider });
+    pinAll(".facts .fl, .link", { color: theme.link });
+    pinAll(".facts .fv a", { color: theme.text });
+    pinAll(".imgnav, .imgcount", {
+      background: "rgba(0, 0, 0, 0.45)",
+      color: "#ffffff",
+    });
   }
 
   function isDisabledSite() {
@@ -419,6 +451,7 @@
 
     shadow.appendChild(card);
     popupCard = card;
+    if (isDarkReaderActive()) hardenAgainstRecoloring(shadow, card, theme);
     document.documentElement.appendChild(popupHost);
 
     // scale the whole card down proportionally when the viewport is
