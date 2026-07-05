@@ -300,9 +300,9 @@
   .wl-card img.thumb {
     display: block;
     width: 100%;
-    aspect-ratio: 1 / 1;
-    object-fit: cover;
-    object-position: 50% 20%;
+    height: auto;
+    max-height: 420px;
+    object-fit: contain;
     background: #303134;
     animation: wl-settle 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards;
     transition: opacity 0.16s ease;

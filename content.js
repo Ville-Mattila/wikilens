@@ -231,10 +231,10 @@
       .thumb {
         display: block;
         width: 100%;
-        aspect-ratio: 1 / 1;
-        object-fit: cover;
-        /* favor the upper part of the image so portrait faces stay in frame */
-        object-position: 50% 20%;
+        height: auto;
+        /* never crop: natural aspect ratio, tall images letterbox at the cap */
+        max-height: 420px;
+        object-fit: contain;
         background: ${theme.thumbBg};
         animation: wl-settle 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards;
         transition: opacity 0.16s ease;
