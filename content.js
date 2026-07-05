@@ -187,6 +187,13 @@
     // contents via composedPath()/shadowRoot; style isolation is unaffected
     const shadow = popupHost.attachShadow({ mode: "open" });
 
+    // Dark Reader honors this marker inside a shadow root and skips
+    // recoloring it — the popup already themes itself (light/dark/auto),
+    // and Dark Reader's repaint was washing it out for its users
+    const lock = document.createElement("meta");
+    lock.name = "darkreader-lock";
+    shadow.appendChild(lock);
+
     const size = SIZES[settings.size] ?? SIZES.medium;
     const theme = THEMES[resolveThemeName()] ?? THEMES.dark;
 
