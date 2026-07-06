@@ -6,32 +6,48 @@ Everything needed to fill in the Developer Dashboard forms.
 
 **Name:** WikiLens
 
-**Summary (132 chars max):**
-Select any text to instantly preview the matching Wikipedia article — image,
-first paragraph, and a link to read more.
+**Summary (132 chars max, currently 130):**
+Select any text to instantly preview the matching Wikipedia article — images,
+first paragraph, quick facts, and a link to read on.
 
 **Category:** Productivity → Tools
 
 **Detailed description:**
 
 > WikiLens turns every page into an encyclopedia. Select any text — if it's
-> the exact title of a Wikipedia article, a small popup appears right where
-> you are, with the article's image, its full first paragraph, and a link to
-> read the rest on Wikipedia.
+> the exact title of a Wikipedia article, an elegant popup appears right
+> where you are: the article's images shown whole (flip through them with an
+> arrow), the full first paragraph, and a link to read the rest on Wikipedia.
 >
-> — Exact by default: previews appear only when your selection is precisely
-> an article title, so the popup never gets in your way. Prefer looser
-> matching? One switch also resolves redirects like "USA" → "United States".
-> Ambiguous titles show a tidy "may refer to:" list instead.
-> — 23 languages: point WikiLens at any major Wikipedia edition — with an
-> automatic English fallback when a title only exists there.
-> — Yours to shape: three popup sizes (Large adds quick facts from the
-> article's infobox, each a clickable link), light/dark/auto themes, an
-> optional Alt+select trigger, and a per-site disable list.
-> — A toolbar popup keeps your recent lookups at hand and lets you search
-> titles directly.
-> — Private by design: your selection travels to Wikipedia's API and nowhere
-> else. No analytics, no tracking, no accounts. Open source.
+> EXACT BY DEFAULT
+> Previews appear only when your selection is precisely an article title, so
+> the popup never gets in your way. Ambiguous titles show a tidy "may refer
+> to:" list — click a meaning to preview it in place. Prefer looser matching?
+> One switch also resolves redirects like "USA" → "United States".
+>
+> QUICK FACTS
+> The Large popup adds up to five facts from the article's infobox — born,
+> died, occupation, founded, population, website — each linkable value a
+> clickable link of its own.
+>
+> 23 LANGUAGES
+> Point WikiLens at any major Wikipedia edition, with an automatic English
+> fallback when a title only exists there.
+>
+> YOURS TO SHAPE
+> Three popup sizes, light/dark/auto themes, an optional Alt+select trigger,
+> and a per-site disable list for sites where you want quiet. Esc dismisses;
+> nothing triggers while you type in forms or editors. Plays nicely with
+> Dark Reader and hover-zoom extensions.
+>
+> ALWAYS AT HAND
+> The toolbar popup keeps your recent lookups nearby (stored only on your
+> device) and lets you look up titles directly.
+>
+> PRIVATE BY DESIGN
+> Your selection travels to Wikimedia's APIs (Wikipedia and Wikidata) and
+> nowhere else. No analytics, no tracking, no accounts. Free software under
+> the GPL-3.0 — source at github.com/Ville-Mattila/wikilens.
 
 **Homepage:** https://ville-mattila.github.io/wikilens/
 **Privacy policy URL:** https://github.com/Ville-Mattila/wikilens/blob/main/PRIVACY.md
