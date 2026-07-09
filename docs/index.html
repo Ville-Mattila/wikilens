@@ -630,7 +630,13 @@
   let seq = 0;
   const cache = new Map();
 
-  demo.addEventListener("mouseup", () => setTimeout(onSelect, 10));
+  demo.addEventListener("mouseup", (e) => {
+    // interactions inside the card (carousel arrow, links, text selection)
+    // must not re-trigger a lookup — that would rebuild the popup and
+    // reset the image carousel to the first frame
+    if (card && card.contains(e.target)) return;
+    setTimeout(onSelect, 10);
+  });
   document.addEventListener("mousedown", (e) => {
     if (card && !card.contains(e.target)) removeCard();
   });
