@@ -394,6 +394,8 @@
     font-weight: 700;
     margin: 0 0 6px;
   }
+  .wl-card .x p { margin: 0 0 8px; }
+  .wl-card .x p:last-child { margin-bottom: 0; }
   .wl-card .x {
     font-size: 14px;
     line-height: 1.5;
@@ -689,6 +691,7 @@
           result = {
             title: d.title,
             extract: d.extract,
+            extractHtml: d.extract_html || null,
             thumb,
             images,
             url: d.content_urls.desktop.page,
@@ -699,6 +702,28 @@
     } catch (_) { /* offline etc. — treat as no match */ }
     cache.set(key, result);
     return result;
+  }
+
+  // Wikipedia's extract_html rendered through a strict whitelist — inline
+  // formatting and paragraphs only, all attributes dropped, nothing else.
+  const FORMAT_TAGS = new Set(["B", "I", "EM", "STRONG", "SUB", "SUP", "SPAN", "P"]);
+  function renderFormattedText(target, html) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    (function walk(srcParent, dstParent) {
+      for (const node of srcParent.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          dstParent.appendChild(document.createTextNode(node.nodeValue));
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          if (FORMAT_TAGS.has(node.tagName)) {
+            const el = document.createElement(node.tagName.toLowerCase());
+            dstParent.appendChild(el);
+            walk(node, el);
+          } else {
+            walk(node, dstParent);
+          }
+        }
+      }
+    })(doc.body, target);
   }
 
   // Gallery images for the carousel — sharp lead thumbnail first, then the
@@ -829,10 +854,15 @@
     card = document.createElement("div");
     card.className = "wl-card";
     card.innerHTML =
-      `<div class="b"><p class="t"></p><p class="x"></p></div>` +
+      `<div class="b"><p class="t"></p><div class="x"></div></div>` +
       `<div class="f"><a target="_blank" rel="noopener">Read in Wikipedia <span class="arr">→</span></a></div>`;
     card.querySelector(".t").textContent = a.title;
-    card.querySelector(".x").textContent = a.extract;
+    const extractEl = card.querySelector(".x");
+    if (a.extractHtml) {
+      renderFormattedText(extractEl, a.extractHtml);
+    } else {
+      extractEl.textContent = a.extract;
+    }
     card.querySelector(".f a").href = a.url;
 
     const images = a.images && a.images.length ? a.images

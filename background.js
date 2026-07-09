@@ -162,6 +162,9 @@ async function lookupInLanguage(title, lang, { exactMatch, size, signal }) {
   return {
     title: data.title,
     extract: data.extract,
+    // first paragraph with Wikipedia's own formatting (bold subject,
+    // italics, sub/superscripts); the popup sanitizes before rendering
+    extractHtml: data.extract_html ?? null,
     thumbnail,
     images,
     facts,

@@ -383,6 +383,8 @@
       .extract::-webkit-scrollbar-track {
         background: transparent;
       }
+      .extract p { margin: 0 0 8px; }
+      .extract p:last-child { margin-bottom: 0; }
       .footer {
         border-top: 1px solid ${theme.divider};
         padding: 8px 14px;
@@ -526,9 +528,13 @@
     const title = document.createElement("p");
     title.className = "title";
     title.textContent = article.title;
-    const extract = document.createElement("p");
+    const extract = document.createElement("div");
     extract.className = "extract";
-    extract.textContent = article.extract;
+    if (article.extractHtml) {
+      renderFormattedText(extract, article.extractHtml);
+    } else {
+      extract.textContent = article.extract;
+    }
     body.append(title, extract);
     card.appendChild(body);
 
@@ -598,6 +604,31 @@
 
     card.appendChild(buildFooter(article.pageUrl));
     return card;
+  }
+
+  // Renders Wikipedia's extract_html into a target element through a strict
+  // whitelist: only inline formatting tags and paragraphs survive, with all
+  // attributes dropped; anything else is unwrapped to its text content.
+  // Remote HTML never reaches innerHTML.
+  const FORMAT_TAGS = new Set(["B", "I", "EM", "STRONG", "SUB", "SUP", "SPAN", "P"]);
+
+  function renderFormattedText(target, html) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    (function walk(srcParent, dstParent) {
+      for (const node of srcParent.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          dstParent.appendChild(document.createTextNode(node.nodeValue));
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          if (FORMAT_TAGS.has(node.tagName)) {
+            const el = document.createElement(node.tagName.toLowerCase());
+            dstParent.appendChild(el);
+            walk(node, el);
+          } else {
+            walk(node, dstParent);
+          }
+        }
+      }
+    })(doc.body, target);
   }
 
   function buildFooter(pageUrl) {
