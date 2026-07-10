@@ -60,7 +60,7 @@ user selects on a web page.
 
 ## Permission justifications
 
-Paste these verbatim — both are under the dashboard's 1000-character limit.
+Paste these verbatim: both are under the dashboard's 1000-character limit.
 
 **Host permission justification (991 chars):**
 
@@ -96,7 +96,7 @@ Paste these verbatim — both are under the dashboard's 1000-character limit.
 
 - Single purpose: yes (see above).
 - Data usage → what user data do you collect?
-  - **Website content** (the user's selected text) — transmitted to the
+  - **Website content** (the user's selected text) - transmitted to the
     Wikipedia API solely to look up the matching article. Not collected or
     stored by the developer.
   - Everything else (personally identifiable info, health, financial,
@@ -124,24 +124,24 @@ content.js, options.html, options.js, and icons/.
 
 Generated in `store-assets/out/` (see `store-assets/`):
 
-- `screenshot-1.png`, `screenshot-2.png`, `screenshot-3.png` — 1280×800
-- `promo-small.png` — 440×280 (small promo tile)
-- `promo-marquee.png` — 1400×560 (marquee, optional)
+- `screenshot-1.png`, `screenshot-2.png`, `screenshot-3.png` - 1280×800
+- `promo-small.png` - 440×280 (small promo tile)
+- `promo-marquee.png` - 1400×560 (marquee, optional)
 
 ## Other stores
 
 ### Microsoft Edge Add-ons
 
-- [ ] Reuses the **same Chrome zip** — no separate build needed
+- [ ] Reuses the **same Chrome zip** - no separate build needed
       (`powershell -File scripts/package.ps1`).
 - [ ] Register a free Partner Center account:
       https://partner.microsoft.com/dashboard/microsoftedge/overview
-- [ ] Listing fields mirror Chrome's — reuse the same name, summary,
+- [ ] Listing fields mirror Chrome's - reuse the same name, summary,
       detailed description, category, screenshots, and privacy policy URL
       from this file.
 - [ ] Permission/single-purpose justifications: paste the same text as the
       Chrome submission; Edge review asks for equivalent disclosures.
-- [ ] Privacy policy URL: same as Chrome —
+- [ ] Privacy policy URL: same as Chrome -
       https://github.com/Ville-Mattila/wikilens/blob/main/PRIVACY.md
 
 ### Firefox AMO (addons.mozilla.org)
@@ -152,11 +152,11 @@ Generated in `store-assets/out/` (see `store-assets/`):
       `firefox/manifest.json` (background as `scripts`, plus
       `browser_specific_settings.gecko`).
 - [ ] Submit at https://addons.mozilla.org/developers/
-- [ ] Source code submission is **not required** — there's no build step,
+- [ ] Source code submission is **not required** - there's no build step,
       the uploaded zip already is the source.
-- [ ] Listing fields mirror Chrome's — reuse the same name, summary,
+- [ ] Listing fields mirror Chrome's - reuse the same name, summary,
       description, and screenshots from this file.
-- [ ] Privacy policy URL: same as Chrome —
+- [ ] Privacy policy URL: same as Chrome -
       https://github.com/Ville-Mattila/wikilens/blob/main/PRIVACY.md
 - [ ] Expect an automated review pass first; note the extension only uses
       `storage` + the wikipedia.org host permission, so it should sail
