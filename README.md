@@ -23,7 +23,7 @@ The toolbar button opens a small popup with your recent lookups (stored only on 
 
 **Chrome / Edge / Brave / Vivaldi:** install from the [Chrome Web Store](https://chromewebstore.google.com/detail/wikilens/ipjonmoniljhdbjdplfcocdfjlbifcck) — one click.
 
-**Firefox:** download `wikilens-firefox-<version>.zip` from the [latest release](https://github.com/Ville-Mattila/wikilens/releases) (no need to unzip) and load it via `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on**. A Firefox Add-ons listing is in review.
+**Firefox:** install from [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/wikilens/) — one click.
 
 **From source (development):**
 
