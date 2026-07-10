@@ -167,9 +167,12 @@
   }
   .btn {
     font-family: "Newsreader", serif;
-    font-size: 17px;
+    font-size: 18px;
     text-decoration: none;
-    padding: 12px 26px;
+    display: inline-flex;
+    align-items: center;
+    height: 58px;
+    padding: 0 30px;
     border-radius: 999px;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
@@ -185,14 +188,31 @@
     border: 1px solid var(--ink);
   }
   .btn-ghost:hover { background: var(--paper-deep); }
-  .store-badge {
-    display: inline-block;
-    line-height: 0;
-    border-radius: 8px;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  /* store badges inside pill buttons: pill background matches each badge's
+     own background so the rectangular badge canvas melts into the pill */
+  .btn-store {
+    padding: 0 24px;
   }
-  .store-badge img { display: block; height: 52px; width: auto; }
-  .store-badge:hover {
+  .btn-store .clip {
+    overflow: hidden;
+    line-height: 0;
+    border-radius: 4px;
+  }
+  .btn-store .clip img {
+    display: block;
+    height: 42px;
+    width: auto;
+    margin: -2px; /* hides the border baked into the Chrome badge image */
+  }
+  .btn-store.chrome {
+    background: #ffffff;
+    border: 1px solid #dadce0;
+  }
+  .btn-store.firefox {
+    background: rgb(16, 154, 214);
+    border: 1px solid rgb(16, 154, 214);
+  }
+  .btn-store:hover {
     transform: translateY(-2px);
     box-shadow: 0 5px 14px rgba(33, 31, 26, 0.25);
   }
@@ -556,10 +576,10 @@
         knowledge.</li>
     </ol>
     <div class="cta-row">
-      <a class="store-badge" href="https://chromewebstore.google.com/detail/wikilens/ipjonmoniljhdbjdplfcocdfjlbifcck"><img
-        src="chrome-badge.png" alt="Available in the Chrome Web Store" height="52" /></a>
-      <a class="store-badge" href="https://addons.mozilla.org/en-US/firefox/addon/wikilens/"><img
-        src="firefox-badge.svg" alt="Get the Firefox Add-on" height="52" /></a>
+      <a class="btn btn-store chrome" href="https://chromewebstore.google.com/detail/wikilens/ipjonmoniljhdbjdplfcocdfjlbifcck"><span class="clip"><img
+        src="chrome-badge.png" alt="Available in the Chrome Web Store" /></span></a>
+      <a class="btn btn-store firefox" href="https://addons.mozilla.org/en-US/firefox/addon/wikilens/"><span class="clip"><img
+        src="firefox-badge.svg" alt="Get the Firefox Add-on" /></span></a>
       <a class="btn btn-ghost" href="#try">Try it right here</a>
       <span class="cta-note">Free · open source · no tracking</span>
     </div>
