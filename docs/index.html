@@ -185,6 +185,17 @@
     border: 1px solid var(--ink);
   }
   .btn-ghost:hover { background: var(--paper-deep); }
+  .store-badge {
+    display: inline-block;
+    line-height: 0;
+    border-radius: 8px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .store-badge img { display: block; height: 52px; width: auto; }
+  .store-badge:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 14px rgba(33, 31, 26, 0.25);
+  }
   .cta-note {
     font-size: 15px;
     font-style: italic;
@@ -545,8 +556,10 @@
         knowledge.</li>
     </ol>
     <div class="cta-row">
-      <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/wikilens/ipjonmoniljhdbjdplfcocdfjlbifcck">Add to Chrome</a>
-      <a class="btn btn-primary" href="https://addons.mozilla.org/en-US/firefox/addon/wikilens/">Add to Firefox</a>
+      <a class="store-badge" href="https://chromewebstore.google.com/detail/wikilens/ipjonmoniljhdbjdplfcocdfjlbifcck"><img
+        src="chrome-badge.png" alt="Available in the Chrome Web Store" height="52" /></a>
+      <a class="store-badge" href="https://addons.mozilla.org/en-US/firefox/addon/wikilens/"><img
+        src="firefox-badge.png" alt="Get the Firefox Add-on" height="52" /></a>
       <a class="btn btn-ghost" href="#try">Try it right here</a>
       <span class="cta-note">Free · open source · no tracking</span>
     </div>
