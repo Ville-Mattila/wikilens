@@ -583,7 +583,7 @@
     title.textContent = article.title;
     const subtitle = document.createElement("p");
     subtitle.className = "subtitle";
-    subtitle.textContent = "may refer to:";
+    subtitle.textContent = article.intro || "may refer to:";
     body.append(title, subtitle);
     card.appendChild(body);
 

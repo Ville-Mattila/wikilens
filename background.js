@@ -138,6 +138,25 @@ async function lookupInLanguage(title, lang, { exactMatch, size, signal }) {
     throw new Error("not an exact title match");
   }
 
+  // Surname/index pages (e.g. "Haaland") are typed "standard" by the API
+  // but their whole content is a list of links — the extract is just a
+  // referral sentence. Treat them like disambiguation pages, keeping the
+  // real intro sentence as the card's subtitle. If the links fetch fails,
+  // fall through to the normal card: unlike true disambiguation pages,
+  // these are still valid articles.
+  const extractText = (data.extract ?? "").trim();
+  const looksLikeIndexPage =
+    extractText.length < 300 &&
+    (/may (also )?refer to/i.test(extractText) || extractText.endsWith(":"));
+  if (looksLikeIndexPage) {
+    try {
+      return await lookupDisambiguation(data, lang, signal, extractText);
+    } catch (err) {
+      if (err?.name === "AbortError") throw err;
+      // no links found — show the regular card below
+    }
+  }
+
   // The summary thumbnail is ~330px wide; request a larger rendition so the
   // square popup image stays sharp (the card is 500 CSS px wide, so high-DPI
   // wants ~1000). Wikimedia only serves a fixed set of widths (330/500/960…)
@@ -210,7 +229,7 @@ async function fetchImages(title, lang, leadThumbnail, signal) {
 // Fetches up to 8 outgoing article links (namespace 0) for a disambiguation
 // page, so the popup can offer them as quick picks. If the links fetch
 // fails, throw so the whole lookup is treated as a miss (current behavior).
-async function lookupDisambiguation(data, lang, signal) {
+async function lookupDisambiguation(data, lang, signal, intro = null) {
   const url =
     `https://${lang}.wikipedia.org/w/api.php?action=query` +
     `&titles=${encodeURIComponent(data.title)}` +
@@ -232,6 +251,7 @@ async function lookupDisambiguation(data, lang, signal) {
   return {
     disambiguation: true,
     title: data.title,
+    intro, // referral sentence for index/surname pages; null → generic subtitle
     options,
     pageUrl:
       data.content_urls?.desktop?.page ??
