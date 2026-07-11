@@ -17,8 +17,8 @@ first paragraph, quick facts, and a link to read on.
 > WikiLens turns every page into an encyclopedia. Select any text, and if it
 > is the exact title of a Wikipedia article, an elegant popup appears right
 > where you are: the article's images shown whole (flip through them with an
-> arrow), the full first paragraph with Wikipedia's own formatting, and a
-> link to read the rest on Wikipedia.
+> arrow or the mouse wheel), the full first paragraph with Wikipedia's own
+> formatting, and a link to read the rest on Wikipedia.
 >
 > EXACT BY DEFAULT
 > Previews appear only when your selection is precisely an article title, so
@@ -26,24 +26,31 @@ first paragraph, quick facts, and a link to read on.
 > to:" list, and clicking a meaning previews it in place. Prefer looser
 > matching? One switch also resolves redirects like "USA" to "United States".
 >
-> QUICK FACTS
+> QUICK FACTS AND RABBIT HOLES
 > The Large popup adds up to five facts from the article's infobox (born,
-> died, occupation, founded, population, website), and every linkable value
-> is a clickable link of its own.
+> died, occupation, founded, population, website), shown in your language
+> when available. Every linkable value is clickable, and clicking a
+> Wikipedia link opens that article's preview right in the popup, with a
+> back button to find your way home. Articles with pronunciation audio get
+> a speaker button next to the title.
 >
 > 23 LANGUAGES
 > Point WikiLens at any major Wikipedia edition, with an automatic English
 > fallback when a title only exists there.
 >
 > YOURS TO SHAPE
-> Three popup sizes. Light, dark, and auto themes. An optional Alt+select
-> trigger, and a per-site disable list for sites where you want quiet. Esc
-> dismisses the popup, and nothing triggers while you type in forms or
-> editors. Plays nicely with Dark Reader and hover-zoom extensions.
+> Three popup sizes. Light, dark, and auto themes. Pin the popup to keep
+> reading while you scroll, drag it anywhere, or copy a citation with one
+> click. Press Ctrl+Shift+L to preview the current selection on demand. An
+> optional Alt+select trigger and a per-site disable list keep it quiet
+> where you want. Esc dismisses the popup, and nothing triggers while you
+> type in forms or editors. Plays nicely with Dark Reader and hover-zoom
+> extensions.
 >
 > ALWAYS AT HAND
 > The toolbar popup keeps your recent lookups nearby (stored only on your
-> device) and lets you look up titles directly.
+> device), lets you look up titles directly, and counts the articles you
+> have previewed.
 >
 > PRIVATE BY DESIGN
 > Your selection travels to Wikimedia's APIs (Wikipedia and Wikidata) and
