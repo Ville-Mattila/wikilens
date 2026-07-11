@@ -57,8 +57,16 @@
 
   let popupHost = null;
   let popupCard = null; // direct reference to the current card element
+  let currentArticle = null; // the article object backing the current card
   let debounceTimer = null;
   let requestSeq = 0; // guards against out-of-order async responses
+
+  // Popup-to-popup navigation: each entry is { article, left, top } captured
+  // right before an in-place replacement (disambiguation option or fact-link
+  // follow). Cleared whenever the popup is dismissed or a fresh selection
+  // lookup opens a brand-new popup.
+  let historyStack = [];
+  let pinned = false; // reading-companion mode: suppresses dismissals/new lookups
 
   document.addEventListener("mouseup", scheduleLookup);
   document.addEventListener("keyup", (e) => {
@@ -77,7 +85,7 @@
       return;
     }
     popupPointerDown = false;
-    if (popupHost) removePopup();
+    if (popupHost && !pinned) dismissPopup();
   });
   document.addEventListener("mouseup", () => {
     // let the selection settle before re-arming the dismissal
@@ -87,23 +95,47 @@
   });
   document.addEventListener("selectionchange", () => {
     if (popupPointerDown) return;
+    if (pinned) return;
     const sel = document.getSelection();
-    if (popupHost && (!sel || sel.isCollapsed)) removePopup();
+    if (popupHost && (!sel || sel.isCollapsed)) dismissPopup();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && popupHost) removePopup();
+    // Escape always closes, even while pinned.
+    if (e.key === "Escape" && popupHost) dismissPopup();
+  });
+
+  // A real dismissal (as opposed to renderPopup's internal teardown-before-
+  // rebuild) ends the whole popup session: pin state and navigation history
+  // don't carry over to the next selection.
+  function dismissPopup() {
+    pinned = false;
+    historyStack = [];
+    removePopup();
+  }
+
+  // The background worker sends this when the user presses the keyboard
+  // shortcut. An explicit command bypasses the trigger-mode/Alt gate, the
+  // disabled-sites gate, and the editable-context gate — the user's intent
+  // is unambiguous — but still respects getSelectedTitle()'s constraints.
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type !== "wikilens-trigger") return;
+    runLookup({ force: true });
   });
 
   function scheduleLookup(event) {
     if (popupHost && event.composedPath?.().includes(popupHost)) return;
+    if (pinned) return; // popup is a pinned reading companion; leave it alone
     if (settings.trigger === "alt" && !event.altKey) return;
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(runLookup, DEBOUNCE_MS);
+    debounceTimer = setTimeout(() => runLookup(), DEBOUNCE_MS);
   }
 
-  function runLookup() {
-    if (isEditableContext()) return;
-    if (isDisabledSite()) return;
+  function runLookup(options = {}) {
+    const { force = false } = options;
+    if (!force) {
+      if (isEditableContext()) return;
+      if (isDisabledSite()) return;
+    }
     const text = getSelectedTitle();
     if (!text) return;
 
@@ -172,6 +204,9 @@
       background: "rgba(0, 0, 0, 0.45)",
       color: "#ffffff",
     });
+    pinAll(".tbtn", { color: theme.text, background: "transparent" });
+    pinAll(".tbtn.pin.on", { color: "#ffffff", background: theme.link });
+    pinAll(".audio-btn", { color: theme.link, background: "transparent" });
   }
 
   function isDisabledSite() {
@@ -226,6 +261,17 @@
   // option click, at which point the original selection may be gone.
   function renderPopup(article, position) {
     removePopup(false); // replace instantly, no exit animation overlap
+
+    // A rect-anchored popup is a brand-new, selection-driven session (fresh
+    // lookup or forced keyboard trigger) rather than an in-place
+    // replacement, so it starts a clean navigation/pin state. In-place
+    // replacements (disambiguation options, fact links, the back button)
+    // pass {left, top} and must NOT wipe the stack they're built on.
+    if (position.rect) {
+      historyStack = [];
+      pinned = false;
+    }
+    currentArticle = article;
 
     popupHost = document.createElement("div");
     popupHost.style.cssText =
@@ -391,7 +437,69 @@
       .footer {
         border-top: 1px solid ${theme.divider};
         padding: 8px 14px;
-        text-align: right;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .toolbar {
+        display: inline-flex;
+        gap: 2px;
+        flex: none;
+      }
+      .tbtn {
+        width: 26px;
+        height: 26px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        color: ${theme.text};
+        opacity: 0.7;
+        font-size: 14px;
+        line-height: 1;
+        padding: 0;
+        margin: 0;
+        cursor: pointer;
+        transition: background-color 0.15s, opacity 0.15s;
+      }
+      .tbtn:hover {
+        background: ${theme.divider};
+        opacity: 1;
+      }
+      .tbtn.pin.on {
+        background: ${theme.link};
+        color: #ffffff;
+        opacity: 1;
+      }
+      .tbtn.grip {
+        cursor: grab;
+      }
+      .tbtn.grip.dragging {
+        cursor: grabbing;
+      }
+      .audio-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: 6px;
+        width: 20px;
+        height: 20px;
+        border: none;
+        background: transparent;
+        color: ${theme.link};
+        font-size: 13px;
+        line-height: 1;
+        padding: 0;
+        cursor: pointer;
+        vertical-align: middle;
+      }
+      .audio-btn:disabled {
+        opacity: 0.4;
+        cursor: default;
       }
       .link {
         font-size: ${size.text}px;
@@ -566,7 +674,10 @@
     body.className = "body";
     const title = document.createElement("p");
     title.className = "title";
-    title.textContent = article.title;
+    title.appendChild(document.createTextNode(article.title));
+    if (typeof article.audioUrl === "string" && article.audioUrl) {
+      title.appendChild(buildAudioButton(article.audioUrl));
+    }
     const extract = document.createElement("div");
     extract.className = "extract";
     if (article.extractHtml) {
@@ -594,6 +705,11 @@
             a.target = "_blank";
             a.rel = "noopener noreferrer";
             a.textContent = part.text;
+            // wiki article links are followed in-place inside the popup;
+            // everything else (e.g. the Website fact) opens a new tab as usual
+            if (isWikiArticleHref(part.href)) {
+              a.addEventListener("click", (e) => handleFactLinkClick(e, a));
+            }
             value.appendChild(a);
           } else {
             value.appendChild(document.createTextNode(part.text));
@@ -604,7 +720,7 @@
       card.appendChild(facts);
     }
 
-    card.appendChild(buildFooter(article.pageUrl));
+    card.appendChild(buildFooter(article.pageUrl, { article, showCopy: true }));
     return card;
   }
 
@@ -641,7 +757,7 @@
     }
     card.appendChild(options);
 
-    card.appendChild(buildFooter(article.pageUrl));
+    card.appendChild(buildFooter(article.pageUrl, { showCopy: false }));
     return card;
   }
 
@@ -670,9 +786,72 @@
     })(doc.body, target);
   }
 
-  function buildFooter(pageUrl) {
+  // Builds a toolbar button consistent with the others: square, transparent,
+  // dimmed theme-text color, themed hover background. mousedown is always
+  // prevented so clicking it never collapses the page's text selection
+  // (same reasoning as the existing option/imgnav buttons).
+  function buildToolbarButton(className, label, title, onClick) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `tbtn ${className}`;
+    btn.textContent = label;
+    btn.title = title;
+    btn.addEventListener("mousedown", (e) => e.preventDefault());
+    btn.addEventListener("click", onClick);
+    return btn;
+  }
+
+  // opts: { article, showCopy } — article is required to build the copy
+  // button (and is always available for the article card); the
+  // disambiguation card omits copy/audio entirely by passing showCopy:false.
+  function buildFooter(pageUrl, opts = {}) {
+    const { article, showCopy = false } = opts;
     const footer = document.createElement("div");
     footer.className = "footer";
+
+    const toolbar = document.createElement("span");
+    toolbar.className = "toolbar";
+
+    if (historyStack.length) {
+      toolbar.appendChild(
+        buildToolbarButton("back", "←", "Back", goBack)
+      );
+    }
+
+    const pinBtn = buildToolbarButton(
+      "pin" + (pinned ? " on" : ""),
+      "⏍",
+      pinned ? "Unpin popup" : "Pin popup",
+      () => {
+        pinned = !pinned;
+        pinBtn.classList.toggle("on", pinned);
+        pinBtn.title = pinned ? "Unpin popup" : "Pin popup";
+      }
+    );
+    toolbar.appendChild(pinBtn);
+
+    // the grip drives the drag from mousedown itself (not click), so it's
+    // built by hand rather than through buildToolbarButton
+    const gripBtn = document.createElement("button");
+    gripBtn.type = "button";
+    gripBtn.className = "tbtn grip";
+    gripBtn.textContent = "⠿";
+    gripBtn.title = "Drag popup";
+    gripBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault(); // protect the page's text selection
+      startDrag(e, gripBtn);
+    });
+    toolbar.appendChild(gripBtn);
+
+    if (showCopy && article) {
+      const copyBtn = buildToolbarButton("copy", "⧉", "Copy citation", () =>
+        copyCitation(article, copyBtn)
+      );
+      toolbar.appendChild(copyBtn);
+    }
+
+    footer.appendChild(toolbar);
+
     const link = document.createElement("a");
     link.className = "link";
     link.href = pageUrl;
@@ -687,25 +866,171 @@
     return footer;
   }
 
-  // Clicking a disambiguation option looks up that title directly. The
-  // current popup position (which may no longer correspond to any live
-  // text selection) is captured first so the replacement article card can
-  // be placed in the same spot. On failure the list is left as-is.
+  // Clicking a disambiguation option looks up that title directly.
   function selectDisambiguationOption(optionTitle) {
+    navigateInPlace(optionTitle);
+  }
+
+  // Returns true for hrefs that point at a Wikipedia article (any language
+  // subdomain) rather than an arbitrary external site (e.g. the Website
+  // fact), so only the former gets intercepted for in-place navigation.
+  function isWikiArticleHref(href) {
+    try {
+      return new URL(href, location.href).pathname.includes("/wiki/");
+    } catch {
+      return false;
+    }
+  }
+
+  // Derives a lookup title from a Wikipedia article URL: the path segment
+  // after "/wiki/", percent-decoded, with underscores turned back into
+  // spaces (Wikipedia's own title <-> URL convention).
+  function wikiTitleFromHref(href) {
+    const url = new URL(href, location.href);
+    const marker = "/wiki/";
+    const idx = url.pathname.indexOf(marker);
+    if (idx === -1) return null;
+    const encoded = url.pathname.slice(idx + marker.length);
+    try {
+      return decodeURIComponent(encoded).replace(/_/g, " ");
+    } catch {
+      return null;
+    }
+  }
+
+  // Plain left-clicks on a wiki fact link navigate the popup in place;
+  // ctrl/cmd/shift-clicks (and middle-clicks, which never fire "click")
+  // keep the browser's normal open-in-new-tab behavior.
+  function handleFactLinkClick(e, a) {
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const title = wikiTitleFromHref(a.href);
+    if (!title) return;
+    e.preventDefault();
+    navigateInPlace(title);
+  }
+
+  // Shared in-place navigation used by both disambiguation options and wiki
+  // fact links: looks up `title`, and on success re-renders at the popup's
+  // current position, pushing the article that was showing onto the history
+  // stack first so the back button can return to it. On failure the current
+  // card is left as-is (no request in flight to undo).
+  function navigateInPlace(title) {
     if (!popupHost) return;
     const left = parseFloat(popupHost.style.left) || 0;
     const top = parseFloat(popupHost.style.top) || 0;
+    const fromArticle = currentArticle;
 
     const seq = ++requestSeq;
     chrome.runtime.sendMessage(
-      { type: "wikilens-lookup", title: optionTitle },
+      { type: "wikilens-lookup", title },
       (response) => {
         if (chrome.runtime.lastError) return;
         if (seq !== requestSeq) return;
         if (!response?.ok) return;
+        if (fromArticle) historyStack.push({ article: fromArticle, left, top });
         renderPopup(response.data, { left, top });
       }
     );
+  }
+
+  // Pops the history stack and re-renders that article at its stored
+  // position — no network request, since we already have the article data.
+  function goBack() {
+    if (!historyStack.length) return;
+    const { article, left, top } = historyStack.pop();
+    renderPopup(article, { left, top });
+  }
+
+  // Starts a popup drag from the grip button. Runs entirely against
+  // popupHost's absolute-positioned left/top (already in page coordinates,
+  // scroll offset included — see positionPopup), so the math stays in
+  // viewport space until the very last step.
+  function startDrag(e, gripBtn) {
+    if (!popupHost) return;
+    const hostRect = popupHost.getBoundingClientRect();
+    const offsetX = e.clientX - hostRect.left;
+    const offsetY = e.clientY - hostRect.top;
+    gripBtn.classList.add("dragging");
+
+    const onMove = (ev) => {
+      if (!popupHost) return;
+      popupHost.style.left = `${ev.clientX - offsetX + window.scrollX}px`;
+      popupHost.style.top = `${ev.clientY - offsetY + window.scrollY}px`;
+    };
+    const onUp = () => {
+      gripBtn.classList.remove("dragging");
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
+
+  // Copies a plain-text citation to the clipboard, falling back to a
+  // temporary textarea + execCommand inside the shadow root when the async
+  // Clipboard API is unavailable or rejects (e.g. insecure context, denied
+  // permission). Briefly swaps the button glyph to a checkmark on success.
+  function copyCitation(article, button) {
+    const text = `${article.title} - ${article.pageUrl}`;
+
+    const flashSuccess = () => {
+      const original = button.textContent;
+      button.disabled = true;
+      button.textContent = "✓";
+      setTimeout(() => {
+        button.textContent = original;
+        button.disabled = false;
+      }, 1200);
+    };
+
+    const fallbackCopy = () => {
+      const root = button.getRootNode();
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      root.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      try {
+        if (document.execCommand("copy")) flashSuccess();
+      } catch {
+        // best-effort only — nothing more we can do here
+      } finally {
+        textarea.remove();
+      }
+    };
+
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(flashSuccess, fallbackCopy);
+    } else {
+      fallbackCopy();
+    }
+  }
+
+  // Builds the small inline speaker button shown after the title when the
+  // article has a pronunciation audio clip.
+  function buildAudioButton(audioUrl) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "audio-btn";
+    btn.textContent = "🔊";
+    btn.title = "Play pronunciation";
+    btn.addEventListener("mousedown", (e) => e.preventDefault());
+    btn.addEventListener("click", () => {
+      const audio = new Audio(audioUrl);
+      const disablePermanently = () => {
+        btn.disabled = true;
+        btn.title = "Audio unavailable";
+      };
+      audio.addEventListener("error", disablePermanently);
+      audio.addEventListener("ended", () => {
+        btn.disabled = false;
+      });
+      btn.disabled = true;
+      audio.play().then(() => {}, disablePermanently);
+    });
+    return btn;
   }
 
   function positionPopup(card, rect, cardWidth) {
@@ -735,6 +1060,7 @@
     const card = popupCard;
     popupHost = null;
     popupCard = null;
+    currentArticle = null;
     darkReaderObserver?.disconnect();
     darkReaderObserver = null;
     if (animate && card && !matchMedia("(prefers-reduced-motion: reduce)").matches) {

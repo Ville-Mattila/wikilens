@@ -37,6 +37,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true; // keep the message channel open for the async response
 });
 
+// Keyboard shortcut: ask the content script on the active tab to look up
+// the current text selection. Fire-and-forget — chrome:// and other
+// extension-restricted pages have no content script listening, so a
+// missing-receiver error is expected there and safely ignored.
+chrome.commands.onCommand.addListener((command) => {
+  if (command !== "lookup-selection") return;
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const tab = tabs[0];
+    if (!tab?.id) return;
+    chrome.tabs.sendMessage(tab.id, { type: "wikilens-trigger" }, () => {
+      void chrome.runtime.lastError; // swallow "no receiving end" errors
+    });
+  });
+});
+
 // Records a successful (non-disambiguation) lookup into chrome.storage.local
 // so the toolbar popup can show recent lookups. Local-only and best-effort:
 // never let a storage failure affect the lookup response.
@@ -45,9 +60,11 @@ const RECENTS_LIMIT = 10;
 
 async function recordRecent(data) {
   try {
-    const { [RECENTS_KEY]: recents } = await chrome.storage.local.get({
-      [RECENTS_KEY]: [],
-    });
+    const { [RECENTS_KEY]: recents, lookupCount } =
+      await chrome.storage.local.get({
+        [RECENTS_KEY]: [],
+        lookupCount: 0,
+      });
     const entry = {
       title: data.title,
       pageUrl: data.pageUrl,
@@ -58,6 +75,7 @@ async function recordRecent(data) {
     deduped.unshift(entry);
     await chrome.storage.local.set({
       [RECENTS_KEY]: deduped.slice(0, RECENTS_LIMIT),
+      lookupCount: lookupCount + 1,
     });
   } catch {
     // best-effort only
@@ -189,10 +207,10 @@ async function lookupInLanguage(title, lang, { exactMatch, size, signal }) {
 
   // the Large popup also shows infobox-style quick facts from Wikidata;
   // gallery images feed the popup's image carousel — fetch both in parallel
-  const [facts, images] = await Promise.all([
+  const [{ facts, audioUrl }, images] = await Promise.all([
     size === "large" && data.wikibase_item
       ? fetchFacts(data.wikibase_item, lang, signal)
-      : [],
+      : { facts: [], audioUrl: null },
     fetchImages(data.title, lang, thumbnail, signal),
   ]);
 
@@ -205,6 +223,7 @@ async function lookupInLanguage(title, lang, { exactMatch, size, signal }) {
     thumbnail,
     images,
     facts,
+    audioUrl,
     pageUrl:
       data.content_urls?.desktop?.page ??
       `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title)}`,
@@ -298,7 +317,9 @@ const FACT_PROPS = [
 ];
 
 // Facts are returned as { label, parts: [{ text, href? }] } so the popup can
-// render each value segment as a link when one exists.
+// render each value segment as a link when one exists. Also resolves P443
+// (pronunciation audio) into a Commons file URL, returned separately as
+// audioUrl since it's not one of the visible fact rows.
 async function fetchFacts(qid, language, signal) {
   try {
     // both Wikidata calls are anonymous CORS requests (origin=*), so no
@@ -308,9 +329,20 @@ async function fetchFacts(qid, language, signal) {
         `&ids=${qid}&props=claims&format=json&origin=*`,
       { signal, headers: API_HEADERS }
     );
-    if (!res.ok) return [];
+    if (!res.ok) return { facts: [], audioUrl: null };
     const claims = (await res.json()).entities?.[qid]?.claims;
-    if (!claims) return [];
+    if (!claims) return { facts: [], audioUrl: null };
+
+    let audioUrl = null;
+    const audioStatements = (claims["P443"] ?? []).filter(
+      (s) => s.mainsnak?.snaktype === "value"
+    );
+    if (audioStatements.length) {
+      const filename = audioStatements[0].mainsnak.datavalue.value;
+      audioUrl =
+        "https://commons.wikimedia.org/wiki/Special:FilePath/" +
+        encodeURIComponent(filename);
+    }
 
     const picked = [];
     const itemIds = new Set();
@@ -329,8 +361,9 @@ async function fetchFacts(qid, language, signal) {
     }
 
     // item-valued claims (occupation, country, …) hold Q-ids; resolve their
-    // English labels and Wikipedia article titles in one batch request, so
-    // each can render as a link to its own article
+    // labels (preferring the user's language, falling back to English) and
+    // Wikipedia article titles in one batch request, so each can render as
+    // a link to its own article
     const wiki = `${language}wiki`;
     const labels = {};
     const articles = {};
@@ -338,14 +371,14 @@ async function fetchFacts(qid, language, signal) {
       const res2 = await fetch(
         "https://www.wikidata.org/w/api.php?action=wbgetentities" +
           `&ids=${[...itemIds].join("|")}&props=labels%7Csitelinks` +
-          `&languages=en&sitefilter=${wiki}%7Cenwiki&format=json&origin=*`,
+          `&languages=${language}%7Cen&sitefilter=${wiki}%7Cenwiki&format=json&origin=*`,
         { signal, headers: API_HEADERS }
       );
       if (res2.ok) {
         for (const [id, entity] of Object.entries(
           (await res2.json()).entities ?? {}
         )) {
-          labels[id] = entity.labels?.en?.value;
+          labels[id] = entity.labels?.[language]?.value ?? entity.labels?.en?.value;
           const link = entity.sitelinks?.[wiki] ?? entity.sitelinks?.enwiki;
           if (link) {
             const host = entity.sitelinks?.[wiki]
@@ -382,13 +415,13 @@ async function fetchFacts(qid, language, signal) {
       if (parts.length) facts.push({ label, parts });
       if (facts.length >= 5) break;
     }
-    return facts;
+    return { facts, audioUrl };
   } catch (err) {
     // facts are a bonus and never block the popup on them — except an abort,
     // which means a newer lookup superseded this one and must propagate up
     // so lookupArticle doesn't cache an incomplete result under a stale key.
     if (err?.name === "AbortError") throw err;
-    return [];
+    return { facts: [], audioUrl: null };
   }
 }
 

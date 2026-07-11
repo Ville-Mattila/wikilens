@@ -3,6 +3,7 @@ const statusEl = document.getElementById("status");
 const resultsEl = document.getElementById("results");
 const recentsEl = document.getElementById("recents");
 const settingsBtn = document.getElementById("settingsBtn");
+const footerEl = document.getElementById("footer");
 
 settingsBtn.addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
@@ -100,4 +101,14 @@ function loadRecents() {
   });
 }
 
+// Muted footer showing the running total of lookups, e.g. "1,284 articles
+// previewed". Hidden entirely until at least one lookup has been recorded.
+function loadLookupCount() {
+  chrome.storage.local.get({ lookupCount: 0 }, ({ lookupCount }) => {
+    if (!lookupCount) return;
+    footerEl.textContent = `${lookupCount.toLocaleString()} articles previewed`;
+  });
+}
+
 loadRecents();
+loadLookupCount();

@@ -26,6 +26,15 @@
   "background": {
     "scripts": ["background.js"]
   },
+  "commands": {
+    "lookup-selection": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
+      },
+      "description": "Preview the selected text"
+    }
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

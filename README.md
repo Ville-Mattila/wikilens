@@ -11,13 +11,16 @@ A browser extension (Chromium and Firefox) that shows an instant Wikipedia previ
 3. If it is, an animated popup springs up next to the selection with:
    - the article's image, shown whole at its natural aspect ratio, with a small arrow for flipping through up to five images when the article has more,
    - the title and the article's full first paragraph, scrollable when long,
-   - on the Large size, up to five quick facts from the article's infobox data (born, died, occupation, founded, population, website and the like), where each linkable value such as a country, an occupation, or a website is clickable,
+   - on the Large size, up to five quick facts from the article's infobox data (born, died, occupation, founded, population, website and the like), where each linkable value such as a country, an occupation, or a website is clickable. Clicking a Wikipedia value opens that article's preview right in the popup, with a back button to return. Articles with pronunciation audio get a small speaker button next to the title,
    - a **Read in Wikipedia →** link that opens the full article in a new tab.
 4. The popup fades away when you click elsewhere, clear the selection, or press Esc.
+5. A small toolbar in the popup's footer lets you pin it open while you scroll and read (Esc still closes), drag it anywhere on the page, and copy a title-plus-link citation with one click.
+
+Press Ctrl+Shift+L (Cmd+Shift+L on Mac) to preview the current selection on demand. The shortcut works even in Alt+select mode, on disabled sites, and inside text fields, since pressing it is an unambiguous request.
 
 Redirects (e.g. "USA") don't trigger the popup by default; only exact article titles like "United States" or "Albert Einstein" do (a setting relaxes this). Matching is case-insensitive, mirroring MediaWiki's own title normalization. Disambiguation titles show a "may refer to:" list, and clicking a meaning previews it in place. If a title doesn't exist in your chosen language edition, English Wikipedia is tried automatically. Lookups never fire inside inputs, textareas, or rich-text editors, results are cached, and all animations respect `prefers-reduced-motion`.
 
-The toolbar button opens a small popup with your recent lookups (stored only on your device) and a search box for looking up titles directly.
+The toolbar button opens a small popup with your recent lookups (stored only on your device), a search box for looking up titles directly, and a running count of articles you have previewed.
 
 ## Install
 
