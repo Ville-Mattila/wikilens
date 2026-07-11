@@ -912,9 +912,20 @@
 
       if (images.length > 1) {
         let index = 0;
+        let lastWheel = 0;
         const counter = document.createElement("span");
         counter.className = "imgcount";
         counter.textContent = `1 / ${images.length}`;
+        const step = (dir) => {
+          index = (index + dir + images.length) % images.length;
+          counter.textContent = `${index + 1} / ${images.length}`;
+          img.classList.add("fade");
+          setTimeout(() => {
+            img.src = images[index];
+            img.onload = () => img.classList.remove("fade");
+          }, 160);
+          new Image().src = images[(index + dir + images.length) % images.length];
+        };
         const next = document.createElement("button");
         next.type = "button";
         next.className = "imgnav";
@@ -922,16 +933,16 @@
         next.title = "Next image";
         // keep the text selection alive so the popup isn't dismissed
         next.addEventListener("mousedown", (e) => e.preventDefault());
-        next.addEventListener("click", () => {
-          index = (index + 1) % images.length;
-          counter.textContent = `${index + 1} / ${images.length}`;
-          img.classList.add("fade");
-          setTimeout(() => {
-            img.src = images[index];
-            img.onload = () => img.classList.remove("fade");
-          }, 160);
-          new Image().src = images[(index + 1) % images.length];
-        });
+        next.addEventListener("click", () => step(1));
+        // wheel over the image flips through the album (down = next)
+        wrap.addEventListener("wheel", (e) => {
+          if (e.deltaY === 0) return;
+          e.preventDefault();
+          const now = Date.now();
+          if (now - lastWheel < 250) return;
+          lastWheel = now;
+          step(e.deltaY > 0 ? 1 : -1);
+        }, { passive: false });
         wrap.append(next, counter);
         new Image().src = images[1];
       }
