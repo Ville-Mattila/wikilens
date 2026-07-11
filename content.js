@@ -276,6 +276,8 @@
     popupHost = document.createElement("div");
     popupHost.style.cssText =
       "position:absolute;z-index:2147483647;width:0;height:0;";
+    // in-place replacements while pinned keep the viewport-fixed mode
+    if (pinned) popupHost.style.position = "fixed";
     // "open" so other extensions (hover-zoom tools etc.) can see the popup's
     // contents via composedPath()/shadowRoot; style isolation is unaffected
     const shadow = popupHost.attachShadow({ mode: "open" });
@@ -591,8 +593,12 @@
         );
       }
     } else {
-      popupHost.style.left = `${position.left}px`;
-      popupHost.style.top = `${position.top}px`;
+      // position.left/top are page coordinates; a pinned (fixed) host needs
+      // them translated into viewport coordinates
+      const left = pinned ? position.left - window.scrollX : position.left;
+      const top = pinned ? position.top - window.scrollY : position.top;
+      popupHost.style.left = `${left}px`;
+      popupHost.style.top = `${top}px`;
     }
   }
 
@@ -826,6 +832,7 @@
         pinned = !pinned;
         pinBtn.classList.toggle("on", pinned);
         pinBtn.title = pinned ? "Unpin popup" : "Pin popup";
+        applyPinMode();
       }
     );
     toolbar.appendChild(pinBtn);
@@ -916,8 +923,7 @@
   // card is left as-is (no request in flight to undo).
   function navigateInPlace(title) {
     if (!popupHost) return;
-    const left = parseFloat(popupHost.style.left) || 0;
-    const top = parseFloat(popupHost.style.top) || 0;
+    const { left, top } = currentPopupPagePosition();
     const fromArticle = currentArticle;
 
     const seq = ++requestSeq;
@@ -941,6 +947,32 @@
     renderPopup(article, { left, top });
   }
 
+  // The popup's current position in PAGE coordinates, regardless of whether
+  // the host is currently absolute (page-anchored) or fixed (pinned to the
+  // viewport). History entries and in-place navigation always store page
+  // coordinates; renderPopup converts back when the popup is pinned.
+  function currentPopupPagePosition() {
+    const r = popupHost.getBoundingClientRect();
+    return { left: r.left + window.scrollX, top: r.top + window.scrollY };
+  }
+
+  // A pinned popup stays put on screen while the page scrolls underneath:
+  // switch the host between absolute (page coordinates) and fixed (viewport
+  // coordinates), converting so it doesn't visually jump on toggle.
+  function applyPinMode() {
+    if (!popupHost) return;
+    const r = popupHost.getBoundingClientRect();
+    if (pinned) {
+      popupHost.style.position = "fixed";
+      popupHost.style.left = `${r.left}px`;
+      popupHost.style.top = `${r.top}px`;
+    } else {
+      popupHost.style.position = "absolute";
+      popupHost.style.left = `${r.left + window.scrollX}px`;
+      popupHost.style.top = `${r.top + window.scrollY}px`;
+    }
+  }
+
   // Starts a popup drag from the grip button. Runs entirely against
   // popupHost's absolute-positioned left/top (already in page coordinates,
   // scroll offset included — see positionPopup), so the math stays in
@@ -954,8 +986,13 @@
 
     const onMove = (ev) => {
       if (!popupHost) return;
-      popupHost.style.left = `${ev.clientX - offsetX + window.scrollX}px`;
-      popupHost.style.top = `${ev.clientY - offsetY + window.scrollY}px`;
+      // a pinned host is position:fixed and lives in viewport coordinates;
+      // an unpinned one is absolute and needs the scroll offset added
+      const fixed = popupHost.style.position === "fixed";
+      popupHost.style.left =
+        `${ev.clientX - offsetX + (fixed ? 0 : window.scrollX)}px`;
+      popupHost.style.top =
+        `${ev.clientY - offsetY + (fixed ? 0 : window.scrollY)}px`;
     };
     const onUp = () => {
       gripBtn.classList.remove("dragging");
