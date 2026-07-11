@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WikiLens support</title>
+<meta name="description" content="Get help with WikiLens: report a bug, request a feature, or read the privacy policy." />
+<link rel="icon" href="../icon128.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..900&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f5efe3;
+    --paper-deep: #ece4d2;
+    --ink: #211f1a;
+    --ink-soft: #57534a;
+    --rule: #c9bfa8;
+    --accent: #2a4b8d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 19px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .sheet {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 56px 28px 96px;
+  }
+  h1 {
+    font-family: "Fraunces", serif;
+    font-size: 44px;
+    font-weight: 560;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+  }
+  .tag {
+    font-style: italic;
+    color: var(--ink-soft);
+    margin: 0 0 40px;
+  }
+  .card {
+    background: var(--paper-deep);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 22px 26px;
+    margin-bottom: 18px;
+  }
+  .card h2 {
+    font-family: "Fraunces", serif;
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+  .card p { margin: 0 0 10px; color: var(--ink-soft); font-size: 17px; }
+  .card p:last-child { margin-bottom: 0; }
+  a { color: var(--accent); }
+  .back {
+    display: inline-block;
+    margin-top: 28px;
+    font-size: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1>WikiLens support</h1>
+  <p class="tag">Something broken? An idea brewing? You are in the right place.</p>
+
+  <div class="card">
+    <h2>Report a bug</h2>
+    <p>Found something that does not work as it should? Open a bug report
+      and include the page, the text you selected, and your browser.</p>
+    <p><a href="https://github.com/Ville-Mattila/wikilens/issues/new?template=bug_report.md">Report
+      a bug on GitHub</a></p>
+  </div>
+
+  <div class="card">
+    <h2>Request a feature</h2>
+    <p>Tell us what WikiLens should learn to do next.</p>
+    <p><a href="https://github.com/Ville-Mattila/wikilens/issues/new?template=feature_request.md">Request
+      a feature on GitHub</a></p>
+  </div>
+
+  <div class="card">
+    <h2>Browse existing issues</h2>
+    <p>Your problem might already have an answer, or a fix on the way.</p>
+    <p><a href="https://github.com/Ville-Mattila/wikilens/issues">All issues
+      on GitHub</a></p>
+  </div>
+
+  <div class="card">
+    <h2>Privacy</h2>
+    <p>WikiLens collects nothing. The full policy spells it out.</p>
+    <p><a href="https://github.com/Ville-Mattila/wikilens/blob/main/PRIVACY.md">Privacy
+      policy</a></p>
+  </div>
+
+  <a class="back" href="../">&larr; Back to the WikiLens landing page</a>
+</div>
+</body>
+</html>
