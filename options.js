@@ -85,6 +85,7 @@ function parseDisabledSites(raw) {
     host = host.toLowerCase();
     host = host.replace(/^[a-z][a-z0-9+.-]*:\/\//, ""); // strip protocol, e.g. https://
     host = host.split(/[/?#]/)[0]; // strip path/query/hash if a full URL was pasted
+    host = host.replace(/:\d+$/, ""); // strip port: location.hostname never has one
     if (host) hosts.push(host);
   }
   return hosts;

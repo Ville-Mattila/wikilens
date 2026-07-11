@@ -140,11 +140,14 @@
   // into our shadow root, now and on every later attempt; (2) pin the
   // palette as inline !important declarations, which outrank stylesheet
   // !important rules in the cascade — nothing injected can override them.
+  let darkReaderObserver = null; // disconnected in removePopup
+
   function hardenAgainstRecoloring(shadow, card, theme) {
     const strip = () =>
       shadow.querySelectorAll("style.darkreader").forEach((s) => s.remove());
     strip();
-    new MutationObserver(strip).observe(shadow, { childList: true });
+    darkReaderObserver = new MutationObserver(strip);
+    darkReaderObserver.observe(shadow, { childList: true });
 
     const pin = (el, props) => {
       for (const [prop, value] of Object.entries(props)) {
@@ -465,6 +468,20 @@
 
     if (position.rect) {
       positionPopup(card, position.rect, baseWidth * scale);
+      // the card grows once the image arrives; re-run the placement so a
+      // tall image doesn't push the card past the viewport bottom
+      const firstImg = card.querySelector("img.thumb");
+      if (firstImg && !firstImg.complete) {
+        firstImg.addEventListener(
+          "load",
+          () => {
+            if (popupCard === card) {
+              positionPopup(card, position.rect, baseWidth * scale);
+            }
+          },
+          { once: true }
+        );
+      }
     } else {
       popupHost.style.left = `${position.left}px`;
       popupHost.style.top = `${position.top}px`;
@@ -504,7 +521,10 @@
           img.classList.add("fade");
           setTimeout(() => {
             img.src = images[index];
-            img.onload = () => img.classList.remove("fade");
+            const unfade = () => img.classList.remove("fade");
+            img.onload = unfade;
+            // a failed load must not leave the image stuck invisible
+            img.onerror = unfade;
           }, 160);
           // warm the cache for the next frame in the same direction
           new Image().src = images[(index + dir + images.length) % images.length];
@@ -715,6 +735,8 @@
     const card = popupCard;
     popupHost = null;
     popupCard = null;
+    darkReaderObserver?.disconnect();
+    darkReaderObserver = null;
     if (animate && card && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
       card.classList.add("out");
       setTimeout(() => host.remove(), 190);

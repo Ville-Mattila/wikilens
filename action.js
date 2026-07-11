@@ -21,6 +21,10 @@ function runLookup(title) {
   chrome.runtime.sendMessage({ type: "wikilens-lookup", title }, (response) => {
     statusEl.textContent = "";
 
+    if (chrome.runtime.lastError) {
+      statusEl.textContent = "Something went wrong. Try again.";
+      return;
+    }
     if (!response?.ok) {
       statusEl.textContent = "No exact match.";
       return;
@@ -52,7 +56,9 @@ function renderDisambiguation(data) {
 }
 
 function makeRow(title, thumbnail, onClick) {
-  const row = document.createElement("div");
+  // a real button: focusable, Enter/Space-activatable, announced as a control
+  const row = document.createElement("button");
+  row.type = "button";
   row.className = "row";
   row.addEventListener("click", onClick);
 

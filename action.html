@@ -83,9 +83,18 @@
       padding: 6px 4px;
       border-radius: 6px;
       cursor: pointer;
+      /* button reset: rows are real buttons for keyboard accessibility */
+      width: 100%;
+      border: none;
+      background: none;
+      font: inherit;
+      color: inherit;
+      text-align: left;
     }
-    .row:hover {
+    .row:hover,
+    .row:focus-visible {
       background: #303134;
+      outline: none;
     }
     .row .thumb {
       flex: none;

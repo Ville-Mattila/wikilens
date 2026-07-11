@@ -11,13 +11,23 @@ const CACHE_LIMIT = 200;
 const lookupCache = new Map();
 const CACHE_MISS = Symbol("miss"); // marks a cached negative result
 
-// aborts any in-flight lookup fetches when a newer selection supersedes them
-let currentAbort = null;
+// Aborts an in-flight lookup when a newer one supersedes it. Keyed per
+// source (tab id, or "extension" for the toolbar popup) so lookups from
+// different tabs never cancel each other.
+const abortControllers = new Map();
+
+// Wikimedia API etiquette: identify the client on every API request.
+const API_HEADERS = {
+  "Api-User-Agent":
+    `WikiLens/${chrome.runtime.getManifest().version} ` +
+    "(https://github.com/Ville-Mattila/wikilens)",
+};
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type !== "wikilens-lookup") return;
 
-  lookupArticle(message.title)
+  const senderKey = sender.tab?.id ?? "extension";
+  lookupArticle(message.title, senderKey)
     .then((data) => {
       sendResponse({ ok: true, data });
       if (!data?.disambiguation) recordRecent(data); // fire-and-forget
@@ -54,7 +64,7 @@ async function recordRecent(data) {
   }
 }
 
-async function lookupArticle(title) {
+async function lookupArticle(title, senderKey = "extension") {
   const { language, exactMatch, size } = await chrome.storage.sync.get({
     language: DEFAULT_LANG,
     exactMatch: true,
@@ -68,9 +78,9 @@ async function lookupArticle(title) {
     return cached;
   }
 
-  currentAbort?.abort();
+  abortControllers.get(senderKey)?.abort();
   const abort = new AbortController();
-  currentAbort = abort;
+  abortControllers.set(senderKey, abort);
 
   // Try the user's language first; if it's not English and the lookup fails
   // for a "not found" reason (404, exact-title mismatch, disambiguation-less
@@ -104,6 +114,10 @@ async function lookupArticle(title) {
   } catch (err) {
     if (err?.name !== "AbortError") cacheSet(cacheKey, CACHE_MISS);
     throw err;
+  } finally {
+    if (abortControllers.get(senderKey) === abort) {
+      abortControllers.delete(senderKey);
+    }
   }
 }
 
@@ -116,7 +130,7 @@ async function lookupInLanguage(title, lang, { exactMatch, size, signal }) {
     `https://${lang}.wikipedia.org/api/rest_v1/page/summary/` +
     `${encodeURIComponent(title)}`;
 
-  const res = await fetch(url, { signal });
+  const res = await fetch(url, { signal, headers: API_HEADERS });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
   const data = await res.json();
@@ -147,7 +161,11 @@ async function lookupInLanguage(title, lang, { exactMatch, size, signal }) {
   const extractText = (data.extract ?? "").trim();
   const looksLikeIndexPage =
     extractText.length < 300 &&
-    (/may (also )?refer to/i.test(extractText) || extractText.endsWith(":"));
+    (/may (also )?refer to/i.test(extractText) ||
+      // a bare trailing colon needs corroborating referral wording, so a
+      // short ordinary article never renders as a fake link list
+      (extractText.endsWith(":") &&
+        /refer|list of|stand for|surname|given name/i.test(extractText)));
   if (looksLikeIndexPage) {
     try {
       return await lookupDisambiguation(data, lang, signal, extractText);
@@ -203,7 +221,7 @@ async function fetchImages(title, lang, leadThumbnail, signal) {
     const res = await fetch(
       `https://${lang}.wikipedia.org/api/rest_v1/page/media-list/` +
         encodeURIComponent(title),
-      { signal }
+      { signal, headers: API_HEADERS }
     );
     if (!res.ok) return lead;
     const items = (await res.json()).items ?? [];
@@ -235,7 +253,7 @@ async function lookupDisambiguation(data, lang, signal, intro = null) {
     `&titles=${encodeURIComponent(data.title)}` +
     "&prop=links&plnamespace=0&pllimit=12&format=json&origin=*";
 
-  const res = await fetch(url, { signal });
+  const res = await fetch(url, { signal, headers: API_HEADERS });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
   const json = await res.json();
@@ -288,7 +306,7 @@ async function fetchFacts(qid, language, signal) {
     const res = await fetch(
       "https://www.wikidata.org/w/api.php?action=wbgetentities" +
         `&ids=${qid}&props=claims&format=json&origin=*`,
-      { signal }
+      { signal, headers: API_HEADERS }
     );
     if (!res.ok) return [];
     const claims = (await res.json()).entities?.[qid]?.claims;
@@ -321,7 +339,7 @@ async function fetchFacts(qid, language, signal) {
         "https://www.wikidata.org/w/api.php?action=wbgetentities" +
           `&ids=${[...itemIds].join("|")}&props=labels%7Csitelinks` +
           `&languages=en&sitefilter=${wiki}%7Cenwiki&format=json&origin=*`,
-        { signal }
+        { signal, headers: API_HEADERS }
       );
       if (res2.ok) {
         for (const [id, entity] of Object.entries(
@@ -352,7 +370,10 @@ async function fetchFacts(qid, language, signal) {
         const text = values[0]
           .replace(/^https?:\/\/(www\.)?/, "")
           .replace(/\/$/, "");
-        parts = [{ text, href: values[0] }];
+        // defense-in-depth: only link out to plain web URLs, never other
+        // schemes, no matter what a vandalized Wikidata claim contains
+        const safeHref = /^https?:\/\//i.test(values[0]) ? values[0] : null;
+        parts = safeHref ? [{ text, href: safeHref }] : [{ text }];
       } else if (type === "item") {
         parts = values
           .filter((v) => labels[v.id])
