@@ -102,11 +102,25 @@
     flex: 1;
     border-top: 1px solid var(--rule);
     box-shadow: 0 3px 0 -2px var(--rule);
+    animation: draw-rule 1.1s 0.15s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .masthead .rulewrap::before { transform-origin: right center; }
+  .masthead .rulewrap::after { transform-origin: left center; }
+  @keyframes draw-rule {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
   }
   .masthead img {
     width: 54px;
     height: 54px;
     display: block;
+    animation: icon-float 7s 2s ease-in-out infinite;
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .masthead img:hover { transform: rotate(-8deg) scale(1.08); }
+  @keyframes icon-float {
+    0%, 100% { translate: 0 0; }
+    50% { translate: 0 -4px; }
   }
 
   /* ------- entry ------- */
@@ -121,7 +135,38 @@
     line-height: 1;
     margin: 10px 0 6px;
   }
-  h1 .dot { color: var(--accent); }
+  h1 .dot {
+    color: var(--accent);
+    display: inline-block;
+    animation: dot-drop 0.55s 1.35s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  }
+  @keyframes dot-drop {
+    from { opacity: 0; transform: translateY(-0.35em); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  /* the product's core gesture, performed on our own headline: a text
+     selection highlight sweeps across, lingers, and releases */
+  h1 .sweep {
+    background-image: linear-gradient(var(--highlight), var(--highlight));
+    background-repeat: no-repeat;
+    background-size: 0% 46%;
+    background-position: 0% 68%;
+    animation: select-sweep 2.6s 0.9s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  }
+  @keyframes select-sweep {
+    0%   { background-size: 0% 46%; background-position: 0% 68%; }
+    38%  { background-size: 100% 46%; background-position: 0% 68%; }
+    62%  { background-size: 100% 46%; background-position: 0% 68%; }
+    100% { background-size: 0% 46%; background-position: 100% 68%; }
+  }
+  .senses li {
+    animation: rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .senses li:nth-child(1) { animation-delay: 0.45s; }
+  .senses li:nth-child(2) { animation-delay: 0.6s; }
+  .cta-row {
+    animation: rise 0.6s 0.75s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
 
   .pron {
     font-size: 20px;
@@ -225,27 +270,64 @@
   /* ------- section headings ------- */
   .section {
     margin-top: 96px;
-    animation: rise 0.7s ease-out both;
   }
-  /* the demo's popup must paint above later sections, whose load
-     animation leaves them as sibling stacking contexts */
+  /* the demo's popup must paint above later sections */
   #try {
     position: relative;
     z-index: 20;
   }
+
+  /* Scroll-triggered reveals: elements get .reveal from the script below
+     and .inview from an IntersectionObserver as they enter the viewport.
+     Without JavaScript nothing is hidden, since .reveal is never added. */
+  .reveal {
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: var(--reveal-delay, 0s);
+  }
+  .reveal.inview {
+    opacity: 1;
+    transform: none;
+  }
+
   .section-head {
     display: flex;
     align-items: baseline;
     gap: 14px;
-    border-bottom: 1px solid var(--rule);
+    position: relative;
     padding-bottom: 8px;
     margin-bottom: 26px;
   }
+  /* the heading's hairline draws itself in as the section arrives */
+  .section-head::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: var(--rule);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 1s 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .section-head.inview::after { transform: scaleX(1); }
   .section-head .no {
     font-family: "Fraunces", serif;
     font-size: 15px;
     color: var(--accent);
     letter-spacing: 0.1em;
+    display: inline-block;
+    opacity: 0;
+    transform: scale(1.6) rotate(-8deg);
+    transition: opacity 0.45s 0.25s ease-out,
+                transform 0.45s 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .section-head.inview .no {
+    opacity: 1;
+    transform: none;
   }
   h2 {
     font-family: "Fraunces", serif;
@@ -274,6 +356,17 @@
   .demo .term {
     border-bottom: 2px dotted var(--accent);
     cursor: text;
+    transition: background 0.25s ease;
+  }
+  .demo .term:hover { background: var(--highlight); }
+  /* once the demo scrolls into view, the first term glows briefly:
+     a wordless "start here" */
+  .demo.inview .dropcap .term:first-of-type {
+    animation: term-hint 1.8s 1s ease-in-out;
+  }
+  @keyframes term-hint {
+    0%, 100% { background: transparent; }
+    35%, 65% { background: var(--highlight); }
   }
   .demo .dropcap::first-letter {
     font-family: "Fraunces", serif;
@@ -465,7 +558,9 @@
   .feature {
     background: var(--paper);
     padding: 22px 20px;
+    transition: background 0.3s ease;
   }
+  .feature:hover { background: #fbf7ee; }
   .feature h3 {
     font-family: "Fraunces", serif;
     font-size: 19px;
@@ -478,7 +573,9 @@
     letter-spacing: 0.08em;
     display: block;
     margin-bottom: 6px;
+    transition: letter-spacing 0.3s ease;
   }
+  .feature:hover h3 .fig { letter-spacing: 0.22em; }
   .feature p {
     margin: 0;
     font-size: 16px;
@@ -546,6 +643,22 @@
   }
   .section:nth-of-type(2) { animation-delay: 0.2s; }
 
+  @media (prefers-reduced-motion: reduce) {
+    .masthead, .entry, .masthead .rulewrap::before, .masthead .rulewrap::after,
+    .masthead img, h1 .dot, h1 .sweep, .senses li, .cta-row,
+    .demo.inview .dropcap .term:first-of-type {
+      animation: none;
+    }
+    h1 .sweep { background: none; }
+    .reveal {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+    .section-head::after { transform: scaleX(1); transition: none; }
+    .section-head .no { opacity: 1; transform: none; transition: none; }
+  }
+
   @media (max-width: 900px) {
     .features { grid-template-columns: repeat(2, 1fr); }
   }
@@ -563,9 +676,11 @@
     <div class="over">The free encyclopedia · one selection away</div>
     <div class="rulewrap"><img src="icon128.png" alt="WikiLens icon" /></div>
   </header>
+  <!-- the headline gets a "text selection" highlight sweep on load -->
+
 
   <section class="entry">
-    <h1>Wiki<span class="dot">·</span>Lens</h1>
+    <h1><span class="sweep">Wiki<span class="dot">·</span>Lens</span></h1>
     <p class="pron"><i>/ˈwɪk.i lenz/</i> · <span class="pos">noun, browser extension</span></p>
     <ol class="senses">
       <li>A browser extension that reveals the Wikipedia article behind any
@@ -999,6 +1114,42 @@
     } else {
       el.remove();
     }
+  }
+})();
+</script>
+<script>
+// Scroll-triggered reveals. Elements are only hidden AFTER this script tags
+// them with .reveal, so a browser without JavaScript sees the full page.
+(() => {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (!("IntersectionObserver" in window)) return;
+
+  document.querySelectorAll(".feature").forEach((el, i) =>
+    el.style.setProperty("--reveal-delay", `${i * 90}ms`));
+  document.querySelectorAll(".steps li").forEach((el, i) =>
+    el.style.setProperty("--reveal-delay", `${i * 70}ms`));
+
+  const targets = [
+    ...document.querySelectorAll(".section-head"),
+    document.querySelector(".demo-hint"),
+    document.querySelector(".demo"),
+    ...document.querySelectorAll(".feature"),
+    ...document.querySelectorAll(".steps li"),
+    document.querySelector("footer"),
+  ].filter(Boolean);
+
+  const io = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("inview");
+        io.unobserve(entry.target);
+      }
+    }
+  }, { threshold: 0.15, rootMargin: "0px 0px -40px 0px" });
+
+  for (const el of targets) {
+    el.classList.add("reveal");
+    io.observe(el);
   }
 })();
 </script>
