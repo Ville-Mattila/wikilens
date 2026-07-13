@@ -4,7 +4,7 @@
 
 (() => {
   const MAX_TITLE_LENGTH = 80;
-  const DEBOUNCE_MS = 250;
+  const DEBOUNCE_MS = 180;
 
   // textMax: the snippet area scrolls once the paragraph exceeds this height.
   // Medium and Large share dimensions; Large additionally shows quick facts.
@@ -118,9 +118,47 @@
   // disabled-sites gate, and the editable-context gate — the user's intent
   // is unambiguous — but still respects getSelectedTitle()'s constraints.
   chrome.runtime.onMessage.addListener((message) => {
-    if (message?.type !== "wikilens-trigger") return;
-    runLookup({ force: true });
+    if (message?.type === "wikilens-trigger") {
+      runLookup({ force: true });
+    } else if (message?.type === "wikilens-enrich") {
+      applyEnrichment(message);
+    }
   });
+
+  // The background answers with the core article first (fast) and streams
+  // facts/images/audio afterwards. Patch them into the open popup, but only
+  // if it still shows the lookup they belong to.
+  function applyEnrichment({ lookupId, facts, images, audioUrl }) {
+    if (!popupHost || !popupCard || !currentArticle) return;
+    if (currentArticle.disambiguation) return;
+    if (currentArticle.lookupId !== lookupId) return;
+
+    currentArticle.facts = facts;
+    currentArticle.images = images;
+    currentArticle.audioUrl = audioUrl;
+    const card = popupCard;
+
+    if (images?.length > 1 && !card.querySelector(".imgnav")) {
+      const newWrap = buildImageCarousel(images, currentArticle.title);
+      const oldWrap = card.querySelector(".thumbwrap");
+      if (oldWrap) {
+        oldWrap.replaceWith(newWrap);
+      } else {
+        card.insertBefore(newWrap, card.firstChild);
+      }
+    }
+    if (facts?.length && !card.querySelector(".facts")) {
+      const footer = card.querySelector(".footer");
+      card.insertBefore(buildFactsBlock(facts), footer);
+    }
+    if (audioUrl && !card.querySelector(".audio-btn")) {
+      card.querySelector(".title")?.appendChild(buildAudioButton(audioUrl));
+    }
+    if (isDarkReaderActive() && popupHost.shadowRoot) {
+      const theme = THEMES[resolveThemeName()] ?? THEMES.dark;
+      hardenAgainstRecoloring(popupHost.shadowRoot, card, theme);
+    }
+  }
 
   function scheduleLookup(event) {
     if (popupHost && event.composedPath?.().includes(popupHost)) return;
@@ -175,6 +213,7 @@
   let darkReaderObserver = null; // disconnected in removePopup
 
   function hardenAgainstRecoloring(shadow, card, theme) {
+    darkReaderObserver?.disconnect(); // idempotent: re-run after enrichment
     const strip = () =>
       shadow.querySelectorAll("style.darkreader").forEach((s) => s.remove());
     strip();
@@ -614,66 +653,7 @@
         ? [article.thumbnail]
         : [];
     if (images.length) {
-      const wrap = document.createElement("div");
-      wrap.className = "thumbwrap";
-      const img = document.createElement("img");
-      img.className = "thumb";
-      img.src = images[0];
-      img.alt = article.title;
-      wrap.appendChild(img);
-
-      if (images.length > 1) {
-        let index = 0;
-        let lastWheel = 0;
-        const counter = document.createElement("span");
-        counter.className = "imgcount";
-        counter.textContent = `1 / ${images.length}`;
-
-        const step = (dir) => {
-          index = (index + dir + images.length) % images.length;
-          counter.textContent = `${index + 1} / ${images.length}`;
-          img.classList.add("fade");
-          setTimeout(() => {
-            img.src = images[index];
-            const unfade = () => img.classList.remove("fade");
-            img.onload = unfade;
-            // a failed load must not leave the image stuck invisible
-            img.onerror = unfade;
-          }, 160);
-          // warm the cache for the next frame in the same direction
-          new Image().src = images[(index + dir + images.length) % images.length];
-        };
-
-        const next = document.createElement("button");
-        next.type = "button";
-        next.className = "imgnav";
-        next.textContent = "›";
-        next.title = "Next image";
-        // preserve the text selection, same as the disambiguation options —
-        // otherwise the selectionchange handler dismisses the popup
-        next.addEventListener("mousedown", (e) => e.preventDefault());
-        next.addEventListener("click", () => step(1));
-
-        // mouse wheel over the image flips through the album; down = next,
-        // up = previous. Non-passive so the page doesn't scroll underneath,
-        // and rate-limited so trackpad wheel streams step one at a time.
-        wrap.addEventListener(
-          "wheel",
-          (e) => {
-            if (e.deltaY === 0) return;
-            e.preventDefault();
-            const now = Date.now();
-            if (now - lastWheel < 250) return;
-            lastWheel = now;
-            step(e.deltaY > 0 ? 1 : -1);
-          },
-          { passive: false }
-        );
-
-        wrap.append(next, counter);
-        new Image().src = images[1]; // first step should be instant
-      }
-      card.appendChild(wrap);
+      card.appendChild(buildImageCarousel(images, article.title));
     }
 
     const body = document.createElement("div");
@@ -695,39 +675,110 @@
     card.appendChild(body);
 
     if (article.facts?.length) {
-      const facts = document.createElement("div");
-      facts.className = "facts";
-      for (const fact of article.facts) {
-        const label = document.createElement("span");
-        label.className = "fl";
-        label.textContent = fact.label;
-        const value = document.createElement("span");
-        value.className = "fv";
-        fact.parts.forEach((part, i) => {
-          if (i > 0) value.appendChild(document.createTextNode(", "));
-          if (part.href) {
-            const a = document.createElement("a");
-            a.href = part.href;
-            a.target = "_blank";
-            a.rel = "noopener noreferrer";
-            a.textContent = part.text;
-            // wiki article links are followed in-place inside the popup;
-            // everything else (e.g. the Website fact) opens a new tab as usual
-            if (isWikiArticleHref(part.href)) {
-              a.addEventListener("click", (e) => handleFactLinkClick(e, a));
-            }
-            value.appendChild(a);
-          } else {
-            value.appendChild(document.createTextNode(part.text));
-          }
-        });
-        facts.append(label, value);
-      }
-      card.appendChild(facts);
+      card.appendChild(buildFactsBlock(article.facts));
     }
 
     card.appendChild(buildFooter(article.pageUrl, { article, showCopy: true }));
     return card;
+  }
+
+  // The image area with its carousel controls. Used when building a card
+  // and again when enrichment upgrades a single-image card to an album.
+  function buildImageCarousel(images, titleText) {
+    const wrap = document.createElement("div");
+    wrap.className = "thumbwrap";
+    const img = document.createElement("img");
+    img.className = "thumb";
+    img.src = images[0];
+    img.alt = titleText;
+    wrap.appendChild(img);
+
+    if (images.length > 1) {
+      let index = 0;
+      let lastWheel = 0;
+      const counter = document.createElement("span");
+      counter.className = "imgcount";
+      counter.textContent = `1 / ${images.length}`;
+
+      const step = (dir) => {
+        index = (index + dir + images.length) % images.length;
+        counter.textContent = `${index + 1} / ${images.length}`;
+        img.classList.add("fade");
+        setTimeout(() => {
+          img.src = images[index];
+          const unfade = () => img.classList.remove("fade");
+          img.onload = unfade;
+          // a failed load must not leave the image stuck invisible
+          img.onerror = unfade;
+        }, 160);
+        // warm the cache for the next frame in the same direction
+        new Image().src = images[(index + dir + images.length) % images.length];
+      };
+
+      const next = document.createElement("button");
+      next.type = "button";
+      next.className = "imgnav";
+      next.textContent = "›";
+      next.title = "Next image";
+      // preserve the text selection, same as the disambiguation options —
+      // otherwise the selectionchange handler dismisses the popup
+      next.addEventListener("mousedown", (e) => e.preventDefault());
+      next.addEventListener("click", () => step(1));
+
+      // mouse wheel over the image flips through the album; down = next,
+      // up = previous. Non-passive so the page doesn't scroll underneath,
+      // and rate-limited so trackpad wheel streams step one at a time.
+      wrap.addEventListener(
+        "wheel",
+        (e) => {
+          if (e.deltaY === 0) return;
+          e.preventDefault();
+          const now = Date.now();
+          if (now - lastWheel < 250) return;
+          lastWheel = now;
+          step(e.deltaY > 0 ? 1 : -1);
+        },
+        { passive: false }
+      );
+
+      wrap.append(next, counter);
+      new Image().src = images[1]; // first step should be instant
+    }
+    return wrap;
+  }
+
+  // The quick-facts grid. Used when building a card and again when
+  // enrichment delivers facts to an already open popup.
+  function buildFactsBlock(factList) {
+    const facts = document.createElement("div");
+    facts.className = "facts";
+    for (const fact of factList) {
+      const label = document.createElement("span");
+      label.className = "fl";
+      label.textContent = fact.label;
+      const value = document.createElement("span");
+      value.className = "fv";
+      fact.parts.forEach((part, i) => {
+        if (i > 0) value.appendChild(document.createTextNode(", "));
+        if (part.href) {
+          const a = document.createElement("a");
+          a.href = part.href;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          a.textContent = part.text;
+          // wiki article links are followed in-place inside the popup;
+          // everything else (e.g. the Website fact) opens a new tab as usual
+          if (isWikiArticleHref(part.href)) {
+            a.addEventListener("click", (e) => handleFactLinkClick(e, a));
+          }
+          value.appendChild(a);
+        } else {
+          value.appendChild(document.createTextNode(part.text));
+        }
+      });
+      facts.append(label, value);
+    }
+    return facts;
   }
 
   // Builds the disambiguation variant: header + subtitle, a list of

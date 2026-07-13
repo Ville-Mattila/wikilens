@@ -11,6 +11,48 @@ const CACHE_LIMIT = 200;
 const lookupCache = new Map();
 const CACHE_MISS = Symbol("miss"); // marks a cached negative result
 
+// The in-memory cache dies with the worker; mirror it in
+// chrome.storage.session (memory-only, survives worker restarts within the
+// browser session) so repeat lookups stay instant after the worker naps.
+const SESSION_CACHE_KEY = "wlCache";
+let cacheSaveTimer = null;
+
+(async () => {
+  try {
+    const { [SESSION_CACHE_KEY]: saved } =
+      await chrome.storage.session.get(SESSION_CACHE_KEY);
+    if (saved) {
+      for (const [key, value] of saved) {
+        if (!lookupCache.has(key)) {
+          lookupCache.set(key, value?.__miss ? CACHE_MISS : value);
+        }
+      }
+    }
+  } catch {
+    // storage.session unavailable: purely in-memory cache, as before
+  }
+})();
+
+function persistCache() {
+  clearTimeout(cacheSaveTimer);
+  cacheSaveTimer = setTimeout(() => {
+    const entries = [...lookupCache].map(([key, value]) => [
+      key,
+      value === CACHE_MISS ? { __miss: true } : value,
+    ]);
+    try {
+      chrome.storage.session
+        .set({ [SESSION_CACHE_KEY]: entries })
+        ?.catch(() => {});
+    } catch {
+      // best-effort only
+    }
+  }, 400);
+}
+
+// ids tie a fast core response to the enrichment that follows it
+let lookupSeq = 0;
+
 // Aborts an in-flight lookup when a newer one supersedes it. Keyed per
 // source (tab id, or "extension" for the toolbar popup) so lookups from
 // different tabs never cancel each other.
@@ -27,7 +69,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type !== "wikilens-lookup") return;
 
   const senderKey = sender.tab?.id ?? "extension";
-  lookupArticle(message.title, senderKey)
+  lookupArticle(message.title, senderKey, sender.tab?.id)
     .then((data) => {
       sendResponse({ ok: true, data });
       if (!data?.disambiguation) recordRecent(data); // fire-and-forget
@@ -82,7 +124,12 @@ async function recordRecent(data) {
   }
 }
 
-async function lookupArticle(title, senderKey = "extension") {
+// Latency architecture: the popup opens on the "core" result alone (one
+// summary request, two in the language-fallback case). Facts, gallery
+// images, and audio are fetched AFTER responding and streamed to the open
+// popup via a wikilens-enrich message, so slow Wikidata calls never delay
+// the popup itself.
+async function lookupArticle(title, senderKey = "extension", tabId = null) {
   const { language, exactMatch, size } = await chrome.storage.sync.get({
     language: DEFAULT_LANG,
     exactMatch: true,
@@ -112,17 +159,26 @@ async function lookupArticle(title, senderKey = "extension") {
     for (let i = 0; i < languages.length; i++) {
       const lang = languages[i];
       try {
-        const result = await lookupInLanguage(title, lang, {
+        const core = await lookupCoreInLanguage(title, lang, {
           exactMatch,
-          size,
           signal: abort.signal,
         });
+
+        const lookupId = ++lookupSeq;
+        const result = { ...core, lookupId };
+        if (!result.disambiguation) {
+          result.images = result.thumbnail ? [result.thumbnail] : [];
+          result.facts = [];
+          result.audioUrl = null;
+          // deliberately not awaited: the popup is already opening
+          enrichArticle(result, lang, size, cacheKey, tabId, abort.signal);
+        }
         cacheSet(cacheKey, result);
         return result;
       } catch (err) {
         if (err?.name === "AbortError") throw err;
-        // lookupInLanguage only ever throws for "not found" reasons (404,
-        // non-standard type, exact-title mismatch, or a failed
+        // lookupCoreInLanguage only ever throws for "not found" reasons
+        // (404, non-standard type, exact-title mismatch, or a failed
         // disambiguation-links fetch), so it's always safe to fall through
         // to the next language here.
         lastErr = err;
@@ -139,11 +195,51 @@ async function lookupArticle(title, senderKey = "extension") {
   }
 }
 
-// Performs the lookup against a single Wikipedia language edition. Returns
-// either a normal article result or a disambiguation result. Throws on any
+// Fetches facts, gallery images, and pronunciation audio for an already
+// delivered core result, merges them into the cache, and pushes them to the
+// tab whose popup is (probably still) showing this article. Best-effort
+// throughout: an abort or failure leaves the core result standing.
+async function enrichArticle(core, lang, size, cacheKey, tabId, signal) {
+  try {
+    const [factsResult, images] = await Promise.all([
+      size === "large" && core.wikibaseItem
+        ? fetchFacts(core.wikibaseItem, lang, signal)
+        : { facts: [], audioUrl: null },
+      fetchImages(core.title, lang, core.thumbnail, signal),
+    ]);
+
+    const merged = {
+      ...core,
+      facts: factsResult.facts,
+      audioUrl: factsResult.audioUrl,
+      images,
+    };
+    cacheSet(cacheKey, merged);
+
+    if (typeof tabId === "number") {
+      chrome.tabs.sendMessage(
+        tabId,
+        {
+          type: "wikilens-enrich",
+          lookupId: core.lookupId,
+          facts: factsResult.facts,
+          audioUrl: factsResult.audioUrl,
+          images,
+        },
+        () => void chrome.runtime.lastError // tab may be gone; that's fine
+      );
+    }
+  } catch {
+    // aborted or failed: the popup already has the core content
+  }
+}
+
+// Performs the fast, popup-blocking part of a lookup against a single
+// Wikipedia language edition: summary, exactness checks, and disambiguation
+// handling. No facts/images/audio here; those are enrichment. Throws on any
 // "not found" condition (404, non-standard type, exact-title mismatch) so
 // the caller can decide whether to fall back to another language.
-async function lookupInLanguage(title, lang, { exactMatch, size, signal }) {
+async function lookupCoreInLanguage(title, lang, { exactMatch, signal }) {
   const url =
     `https://${lang}.wikipedia.org/api/rest_v1/page/summary/` +
     `${encodeURIComponent(title)}`;
@@ -205,15 +301,6 @@ async function lookupInLanguage(title, lang, { exactMatch, size, signal }) {
     thumbnail = thumbnail.replace(/\/(\d+)px-/, "/500px-");
   }
 
-  // the Large popup also shows infobox-style quick facts from Wikidata;
-  // gallery images feed the popup's image carousel — fetch both in parallel
-  const [{ facts, audioUrl }, images] = await Promise.all([
-    size === "large" && data.wikibase_item
-      ? fetchFacts(data.wikibase_item, lang, signal)
-      : { facts: [], audioUrl: null },
-    fetchImages(data.title, lang, thumbnail, signal),
-  ]);
-
   return {
     title: data.title,
     extract: data.extract,
@@ -221,9 +308,8 @@ async function lookupInLanguage(title, lang, { exactMatch, size, signal }) {
     // italics, sub/superscripts); the popup sanitizes before rendering
     extractHtml: data.extract_html ?? null,
     thumbnail,
-    images,
-    facts,
-    audioUrl,
+    // enrichArticle needs the entity id later; harmless in the response
+    wikibaseItem: data.wikibase_item ?? null,
     pageUrl:
       data.content_urls?.desktop?.page ??
       `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title)}`,
@@ -301,6 +387,7 @@ function cacheSet(key, value) {
     lookupCache.delete(lookupCache.keys().next().value); // evict oldest
   }
   lookupCache.set(key, value);
+  persistCache();
 }
 
 // [property id, display label, value type, max values to join]
