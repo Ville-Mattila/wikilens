@@ -201,12 +201,13 @@ async function lookupArticle(title, senderKey = "extension", tabId = null) {
 // throughout: an abort or failure leaves the core result standing.
 async function enrichArticle(core, lang, size, cacheKey, tabId, signal) {
   try {
-    const [factsResult, images, fullExtractHtml] = await Promise.all([
+    const [factsResult, images, fullExtractHtml, sections] = await Promise.all([
       size === "large" && core.wikibaseItem
         ? fetchFacts(core.wikibaseItem, lang, signal)
         : { facts: [], audioUrl: null },
       fetchImages(core.title, lang, core.thumbnail, signal),
       fetchLeadSection(core.title, lang, signal),
+      fetchSections(core.title, lang, signal),
     ]);
 
     const merged = {
@@ -215,6 +216,7 @@ async function enrichArticle(core, lang, size, cacheKey, tabId, signal) {
       audioUrl: factsResult.audioUrl,
       images,
       fullExtractHtml,
+      sections,
     };
     cacheSet(cacheKey, merged);
 
@@ -228,12 +230,48 @@ async function enrichArticle(core, lang, size, cacheKey, tabId, signal) {
           audioUrl: factsResult.audioUrl,
           images,
           fullExtractHtml,
+          sections,
         },
         () => void chrome.runtime.lastError // tab may be gone; that's fine
       );
     }
   } catch {
     // aborted or failed: the popup already has the core content
+  }
+}
+
+// Housekeeping sections that end most articles; not worth a chip.
+const BOILERPLATE_SECTIONS =
+  /^(see also|notes|references|external links|further reading|bibliography|citations|sources|footnotes|gallery)$/i;
+
+// Top-level section titles with their anchors, so the popup can offer an
+// "In this article" table of contents. Best-effort: [] hides the block.
+async function fetchSections(title, lang, signal) {
+  try {
+    const res = await fetch(
+      `https://${lang}.wikipedia.org/w/api.php?action=parse&prop=sections` +
+        `&page=${encodeURIComponent(title)}&format=json&formatversion=2&origin=*`,
+      { signal, headers: API_HEADERS }
+    );
+    if (!res.ok) return [];
+    const all = (await res.json()).parse?.sections ?? [];
+    const sections = [];
+    for (const s of all) {
+      if (s.toclevel !== 1 || !s.anchor) continue;
+      // no DOM in a service worker: strip tags and the common entities
+      const line = String(s.line)
+        .replace(/<[^>]*>/g, "")
+        .replace(/&amp;/g, "&")
+        .replace(/&nbsp;/g, " ")
+        .trim();
+      if (!line || BOILERPLATE_SECTIONS.test(line)) continue;
+      sections.push({ title: line, anchor: s.anchor });
+      if (sections.length >= 6) break;
+    }
+    return sections;
+  } catch (err) {
+    if (err?.name === "AbortError") throw err;
+    return [];
   }
 }
 

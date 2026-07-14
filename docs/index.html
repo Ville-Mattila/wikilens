@@ -520,6 +520,50 @@
   }
   .wl-card .x p { margin: 0 0 8px; }
   .wl-card .x p:last-child { margin-bottom: 0; }
+  .wl-card .xwrap { position: relative; }
+  .wl-card .fadeout {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 26px;
+    background: linear-gradient(to bottom, transparent, var(--card-bg));
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .wl-card .sections {
+    border-top: 1px solid var(--card-divider);
+    padding: 10px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    animation: wl-rise 0.38s 0.27s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .wl-card .sections .sl {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--card-link);
+    margin-right: 2px;
+  }
+  .wl-card .sections a {
+    font-size: 12px;
+    color: var(--card-text);
+    opacity: 0.85;
+    text-decoration: none;
+    border: 1px solid var(--card-divider);
+    border-radius: 999px;
+    padding: 2px 9px;
+    transition: color 0.15s, border-color 0.15s, opacity 0.15s;
+  }
+  .wl-card .sections a:hover {
+    color: var(--card-link);
+    border-color: var(--card-link);
+    opacity: 1;
+  }
   .wl-card .x {
     font-size: 14px;
     line-height: 1.5;
@@ -834,10 +878,11 @@
           } else if (thumb && ow > 500) {
             thumb = thumb.replace(/\/(\d+)px-/, "/500px-");
           }
-          const [facts, images, fullExtractHtml] = await Promise.all([
+          const [facts, images, fullExtractHtml, sections] = await Promise.all([
             d.wikibase_item ? fetchFacts(d.wikibase_item) : [],
             fetchImages(d.title, thumb),
             fetchLeadSection(d.title),
+            fetchSections(d.title),
           ]);
           result = {
             title: d.title,
@@ -847,6 +892,7 @@
             images,
             url: d.content_urls.desktop.page,
             facts,
+            sections,
           };
         }
       }
@@ -876,6 +922,32 @@
         }
       }
     })(doc.body, target);
+  }
+
+  // Top-level section titles with anchors for the "In this article" chips.
+  const BOILERPLATE_SECTIONS =
+    /^(see also|notes|references|external links|further reading|bibliography|citations|sources|footnotes|gallery)$/i;
+  async function fetchSections(title) {
+    try {
+      const res = await fetch(
+        "https://en.wikipedia.org/w/api.php?action=parse&prop=sections" +
+        "&page=" + encodeURIComponent(title) +
+        "&format=json&formatversion=2&origin=*"
+      );
+      if (!res.ok) return [];
+      const all = (await res.json()).parse?.sections ?? [];
+      const sections = [];
+      for (const s of all) {
+        if (s.toclevel !== 1 || !s.anchor) continue;
+        const line = String(s.line).replace(/<[^>]*>/g, "").trim();
+        if (!line || BOILERPLATE_SECTIONS.test(line)) continue;
+        sections.push({ title: line, anchor: s.anchor });
+        if (sections.length >= 6) break;
+      }
+      return sections;
+    } catch (_) {
+      return [];
+    }
   }
 
   // The whole lead section (everything before the first heading) as limited
@@ -1023,7 +1095,8 @@
     card = document.createElement("div");
     card.className = "wl-card";
     card.innerHTML =
-      `<div class="b"><p class="t"></p><div class="x"></div></div>` +
+      `<div class="b"><p class="t"></p>` +
+      `<div class="xwrap"><div class="x"></div><div class="fadeout"></div></div></div>` +
       `<div class="f"><a target="_blank" rel="noopener">Read in Wikipedia <span class="arr">→</span></a></div>`;
     card.querySelector(".t").textContent = a.title;
     const extractEl = card.querySelector(".x");
@@ -1032,7 +1105,34 @@
     } else {
       extractEl.textContent = a.extract;
     }
+    // the bottom fade shows only while there is more text to scroll to
+    const fadeEl = card.querySelector(".fadeout");
+    const updateFade = () => {
+      const more =
+        extractEl.scrollHeight - extractEl.scrollTop - extractEl.clientHeight > 4;
+      fadeEl.style.opacity = more ? "1" : "0";
+    };
+    extractEl.addEventListener("scroll", updateFade, { passive: true });
+    requestAnimationFrame(updateFade);
     card.querySelector(".f a").href = a.url;
+
+    if (a.sections && a.sections.length) {
+      const block = document.createElement("div");
+      block.className = "sections";
+      const label = document.createElement("span");
+      label.className = "sl";
+      label.textContent = "In this article";
+      block.appendChild(label);
+      for (const section of a.sections) {
+        const link = document.createElement("a");
+        link.href = `${a.url}#${section.anchor}`;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = section.title;
+        block.appendChild(link);
+      }
+      card.insertBefore(block, card.querySelector(".f"));
+    }
 
     const images = a.images && a.images.length ? a.images
       : a.thumb ? [a.thumb] : [];

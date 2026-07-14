@@ -128,7 +128,9 @@
   // The background answers with the core article first (fast) and streams
   // facts/images/audio afterwards. Patch them into the open popup, but only
   // if it still shows the lookup they belong to.
-  function applyEnrichment({ lookupId, facts, images, audioUrl, fullExtractHtml }) {
+  function applyEnrichment({
+    lookupId, facts, images, audioUrl, fullExtractHtml, sections,
+  }) {
     if (!popupHost || !popupCard || !currentArticle) return;
     if (currentArticle.disambiguation) return;
     if (currentArticle.lookupId !== lookupId) return;
@@ -137,16 +139,27 @@
     currentArticle.images = images;
     currentArticle.audioUrl = audioUrl;
     if (fullExtractHtml) currentArticle.fullExtractHtml = fullExtractHtml;
+    if (sections) currentArticle.sections = sections;
     const card = popupCard;
 
     // Grow the first paragraph into the whole lead section, but never
     // yank content out from under a reader who has already scrolled.
+    const extract = card.querySelector(".extract");
     if (fullExtractHtml) {
-      const extract = card.querySelector(".extract");
       if (extract && extract.scrollTop === 0) {
         extract.replaceChildren();
         renderFormattedText(extract, fullExtractHtml);
       }
+    }
+    extract?._wlFadeUpdate?.(); // content may have grown past the cap
+
+    if (sections?.length && !card.querySelector(".sections")) {
+      const anchor =
+        card.querySelector(".facts") ?? card.querySelector(".footer");
+      card.insertBefore(
+        buildSectionsBlock(sections, currentArticle.pageUrl),
+        anchor
+      );
     }
 
     if (images?.length > 1 && !card.querySelector(".imgnav")) {
@@ -247,9 +260,17 @@
     pinAll(".title, .extract, .subtitle, .option, .facts .fv", {
       color: theme.text,
     });
-    pinAll(".facts, .footer", { "border-color": theme.divider });
-    pinAll(".facts .fl, .link", { color: theme.link });
+    pinAll(".facts, .footer, .sections", { "border-color": theme.divider });
+    pinAll(".facts .fl, .link, .sections .sl", { color: theme.link });
     pinAll(".facts .fv a", { color: theme.text });
+    pinAll(".sections a", {
+      color: theme.text,
+      background: "transparent",
+      "border-color": theme.divider,
+    });
+    pinAll(".fadeout", {
+      "background-image": `linear-gradient(to bottom, transparent, ${theme.bg})`,
+    });
     pinAll(".imgnav, .imgcount", {
       background: "rgba(0, 0, 0, 0.45)",
       color: "#ffffff",
@@ -454,7 +475,8 @@
         text-decoration-color: ${theme.link};
       }
       @media (prefers-reduced-motion: reduce) {
-        .card, .card.out, .thumb, .title, .extract, .facts, .footer { animation: none; }
+        .card, .card.out, .thumb, .title, .extract, .facts, .sections,
+        .footer { animation: none; }
       }
       .body { padding: 12px 14px 10px; }
       .title {
@@ -486,6 +508,51 @@
       }
       .extract p { margin: 0 0 8px; }
       .extract p:last-child { margin-bottom: 0; }
+      .extractwrap { position: relative; }
+      /* a soft fade at the text's lower edge while there is more to read */
+      .fadeout {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 26px;
+        background: linear-gradient(to bottom, transparent, ${theme.bg});
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.25s ease;
+      }
+      .sections {
+        border-top: 1px solid ${theme.divider};
+        padding: 10px 14px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        animation: wl-rise 0.38s 0.27s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+      }
+      .sections .sl {
+        font-size: ${size.text - 3}px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: ${theme.link};
+        margin-right: 2px;
+      }
+      .sections a {
+        font-size: ${size.text - 2}px;
+        color: ${theme.text};
+        opacity: 0.85;
+        text-decoration: none;
+        border: 1px solid ${theme.divider};
+        border-radius: 999px;
+        padding: 2px 9px;
+        transition: color 0.15s, border-color 0.15s, opacity 0.15s;
+      }
+      .sections a:hover {
+        color: ${theme.link};
+        border-color: ${theme.link};
+        opacity: 1;
+      }
       .footer {
         border-top: 1px solid ${theme.divider};
         padding: 8px 14px;
@@ -683,9 +750,18 @@
     } else {
       extract.textContent = article.extract;
     }
-    body.append(title, extract);
+    const extractWrap = document.createElement("div");
+    extractWrap.className = "extractwrap";
+    const fade = document.createElement("div");
+    fade.className = "fadeout";
+    extractWrap.append(extract, fade);
+    attachScrollFade(extract, fade);
+    body.append(title, extractWrap);
     card.appendChild(body);
 
+    if (article.sections?.length) {
+      card.appendChild(buildSectionsBlock(article.sections, article.pageUrl));
+    }
     if (article.facts?.length) {
       card.appendChild(buildFactsBlock(article.facts));
     }
@@ -757,6 +833,39 @@
       new Image().src = images[1]; // first step should be instant
     }
     return wrap;
+  }
+
+  // Shows the bottom fade only while there is more text to scroll to,
+  // updating live as the reader scrolls or the content grows.
+  function attachScrollFade(extract, fade) {
+    const update = () => {
+      const more =
+        extract.scrollHeight - extract.scrollTop - extract.clientHeight > 4;
+      fade.style.opacity = more ? "1" : "0";
+    };
+    extract.addEventListener("scroll", update, { passive: true });
+    extract._wlFadeUpdate = update; // enrichment re-checks after growth
+    requestAnimationFrame(update);
+  }
+
+  // "In this article": the article's top-level sections as chips that open
+  // Wikipedia at that exact section in a new tab.
+  function buildSectionsBlock(sections, pageUrl) {
+    const block = document.createElement("div");
+    block.className = "sections";
+    const label = document.createElement("span");
+    label.className = "sl";
+    label.textContent = "In this article";
+    block.appendChild(label);
+    for (const section of sections) {
+      const a = document.createElement("a");
+      a.href = `${pageUrl}#${section.anchor}`;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = section.title;
+      block.appendChild(a);
+    }
+    return block;
   }
 
   // The quick-facts grid. Used when building a card and again when
