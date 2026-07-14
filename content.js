@@ -9,9 +9,9 @@
   // textMax: the snippet area scrolls once the paragraph exceeds this height.
   // Medium and Large share dimensions; Large additionally shows quick facts.
   const SIZES = {
-    small: { width: 325, textMax: 110, title: 14, text: 12 },
-    medium: { width: 500, textMax: 290, title: 18, text: 14 },
-    large: { width: 500, textMax: 290, title: 18, text: 14 },
+    small: { width: 325, textMax: 180, title: 14, text: 12 },
+    medium: { width: 500, textMax: 375, title: 18, text: 14 },
+    large: { width: 500, textMax: 375, title: 18, text: 14 },
   };
 
   const THEMES = {
@@ -128,7 +128,7 @@
   // The background answers with the core article first (fast) and streams
   // facts/images/audio afterwards. Patch them into the open popup, but only
   // if it still shows the lookup they belong to.
-  function applyEnrichment({ lookupId, facts, images, audioUrl }) {
+  function applyEnrichment({ lookupId, facts, images, audioUrl, fullExtractHtml }) {
     if (!popupHost || !popupCard || !currentArticle) return;
     if (currentArticle.disambiguation) return;
     if (currentArticle.lookupId !== lookupId) return;
@@ -136,7 +136,18 @@
     currentArticle.facts = facts;
     currentArticle.images = images;
     currentArticle.audioUrl = audioUrl;
+    if (fullExtractHtml) currentArticle.fullExtractHtml = fullExtractHtml;
     const card = popupCard;
+
+    // Grow the first paragraph into the whole lead section, but never
+    // yank content out from under a reader who has already scrolled.
+    if (fullExtractHtml) {
+      const extract = card.querySelector(".extract");
+      if (extract && extract.scrollTop === 0) {
+        extract.replaceChildren();
+        renderFormattedText(extract, fullExtractHtml);
+      }
+    }
 
     if (images?.length > 1 && !card.querySelector(".imgnav")) {
       const newWrap = buildImageCarousel(images, currentArticle.title);
@@ -666,8 +677,9 @@
     }
     const extract = document.createElement("div");
     extract.className = "extract";
-    if (article.extractHtml) {
-      renderFormattedText(extract, article.extractHtml);
+    const bodyHtml = article.fullExtractHtml ?? article.extractHtml;
+    if (bodyHtml) {
+      renderFormattedText(extract, bodyHtml);
     } else {
       extract.textContent = article.extract;
     }
@@ -831,6 +843,9 @@
         if (node.nodeType === Node.TEXT_NODE) {
           dstParent.appendChild(document.createTextNode(node.nodeValue));
         } else if (node.nodeType === Node.ELEMENT_NODE) {
+          // TextExtracts emits placeholder paragraphs with no text; keeping
+          // them would add phantom margins between real paragraphs
+          if (node.tagName === "P" && !node.textContent.trim()) continue;
           if (FORMAT_TAGS.has(node.tagName)) {
             const el = document.createElement(node.tagName.toLowerCase());
             dstParent.appendChild(el);

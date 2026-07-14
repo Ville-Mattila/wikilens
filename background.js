@@ -201,11 +201,12 @@ async function lookupArticle(title, senderKey = "extension", tabId = null) {
 // throughout: an abort or failure leaves the core result standing.
 async function enrichArticle(core, lang, size, cacheKey, tabId, signal) {
   try {
-    const [factsResult, images] = await Promise.all([
+    const [factsResult, images, fullExtractHtml] = await Promise.all([
       size === "large" && core.wikibaseItem
         ? fetchFacts(core.wikibaseItem, lang, signal)
         : { facts: [], audioUrl: null },
       fetchImages(core.title, lang, core.thumbnail, signal),
+      fetchLeadSection(core.title, lang, signal),
     ]);
 
     const merged = {
@@ -213,6 +214,7 @@ async function enrichArticle(core, lang, size, cacheKey, tabId, signal) {
       facts: factsResult.facts,
       audioUrl: factsResult.audioUrl,
       images,
+      fullExtractHtml,
     };
     cacheSet(cacheKey, merged);
 
@@ -225,12 +227,33 @@ async function enrichArticle(core, lang, size, cacheKey, tabId, signal) {
           facts: factsResult.facts,
           audioUrl: factsResult.audioUrl,
           images,
+          fullExtractHtml,
         },
         () => void chrome.runtime.lastError // tab may be gone; that's fine
       );
     }
   } catch {
     // aborted or failed: the popup already has the core content
+  }
+}
+
+// The summary API only carries the first paragraph; TextExtracts with
+// exintro returns the article's whole lead section (everything before the
+// first heading) as limited HTML. Best-effort: null keeps the summary text.
+async function fetchLeadSection(title, lang, signal) {
+  try {
+    const res = await fetch(
+      `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts` +
+        `&exintro=1&titles=${encodeURIComponent(title)}` +
+        "&format=json&formatversion=2&origin=*",
+      { signal, headers: API_HEADERS }
+    );
+    if (!res.ok) return null;
+    const extract = (await res.json()).query?.pages?.[0]?.extract;
+    return typeof extract === "string" && extract.trim() ? extract : null;
+  } catch (err) {
+    if (err?.name === "AbortError") throw err;
+    return null;
   }
 }
 

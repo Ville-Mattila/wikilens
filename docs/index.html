@@ -524,7 +524,7 @@
     font-size: 14px;
     line-height: 1.5;
     margin: 0;
-    max-height: 290px;
+    max-height: 375px;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-right: 6px;
@@ -834,14 +834,15 @@
           } else if (thumb && ow > 500) {
             thumb = thumb.replace(/\/(\d+)px-/, "/500px-");
           }
-          const [facts, images] = await Promise.all([
+          const [facts, images, fullExtractHtml] = await Promise.all([
             d.wikibase_item ? fetchFacts(d.wikibase_item) : [],
             fetchImages(d.title, thumb),
+            fetchLeadSection(d.title),
           ]);
           result = {
             title: d.title,
             extract: d.extract,
-            extractHtml: d.extract_html || null,
+            extractHtml: fullExtractHtml || d.extract_html || null,
             thumb,
             images,
             url: d.content_urls.desktop.page,
@@ -864,6 +865,7 @@
         if (node.nodeType === Node.TEXT_NODE) {
           dstParent.appendChild(document.createTextNode(node.nodeValue));
         } else if (node.nodeType === Node.ELEMENT_NODE) {
+          if (node.tagName === "P" && !node.textContent.trim()) continue;
           if (FORMAT_TAGS.has(node.tagName)) {
             const el = document.createElement(node.tagName.toLowerCase());
             dstParent.appendChild(el);
@@ -874,6 +876,23 @@
         }
       }
     })(doc.body, target);
+  }
+
+  // The whole lead section (everything before the first heading) as limited
+  // HTML, replacing the summary's single first paragraph. Best-effort.
+  async function fetchLeadSection(title) {
+    try {
+      const res = await fetch(
+        "https://en.wikipedia.org/w/api.php?action=query&prop=extracts" +
+        "&exintro=1&titles=" + encodeURIComponent(title) +
+        "&format=json&formatversion=2&origin=*"
+      );
+      if (!res.ok) return null;
+      const extract = (await res.json()).query?.pages?.[0]?.extract;
+      return typeof extract === "string" && extract.trim() ? extract : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   // Gallery images for the carousel - sharp lead thumbnail first, then the
