@@ -515,7 +515,7 @@
       .extract a:hover { text-decoration: underline; }
       /* small outward arrow marks that the link leaves for Wikipedia */
       .extract a::after {
-        content: "\\2197";
+        content: "↗";
         font-size: 0.7em;
         opacity: 0.7;
         margin-left: 1px;
