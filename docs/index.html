@@ -523,16 +523,13 @@
   .wl-card .x ul, .wl-card .x ol { margin: 0 0 8px; padding-left: 20px; }
   .wl-card .x li { margin: 0 0 4px; }
   .wl-card .x a {
-    color: var(--card-link);
+    color: inherit;
     text-decoration: none;
+    border-bottom: 1px dotted var(--card-border);
   }
-  .wl-card .x a:hover { text-decoration: underline; }
-  .wl-card .x a::after {
-    content: "↗";
-    font-size: 0.7em;
-    opacity: 0.7;
-    margin-left: 1px;
-    vertical-align: super;
+  .wl-card .x a:hover {
+    color: var(--card-link);
+    border-bottom-color: var(--card-link);
   }
   .wl-card .x h3, .wl-card .x h4 {
     font-size: 15px;
@@ -1164,9 +1161,39 @@
     }
   }
 
-  function showCard(a, sel) {
+  // Derives a lookup title from a Wikipedia article URL.
+  function titleFromWikiHref(href) {
+    try {
+      const path = new URL(href).pathname;
+      const idx = path.indexOf("/wiki/");
+      if (idx === -1) return null;
+      return decodeURIComponent(path.slice(idx + 6)).replace(/_/g, " ");
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Body links preview in the popup, like the extension does; modifier
+  // clicks and unpreviewable targets fall back to Wikipedia in a new tab.
+  function hookBodyLinks(container) {
+    for (const a of container.querySelectorAll("a[href*='/wiki/']")) {
+      a.addEventListener("click", async (e) => {
+        if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+        const title = titleFromWikiHref(a.href);
+        if (!title) return;
+        e.preventDefault();
+        if (!card) return;
+        const pos = { left: card.style.left, top: card.style.top };
+        const res = await lookup(title);
+        if (res) showCard(res, null, pos);
+        else window.open(a.href, "_blank", "noopener");
+      });
+    }
+  }
+
+  function showCard(a, sel, fixedPos) {
     removeCard(false); // replace instantly, no exit animation overlap
-    const range = sel.getRangeAt(0).getBoundingClientRect();
+    const range = fixedPos ? null : sel.getRangeAt(0).getBoundingClientRect();
     const host = demo.getBoundingClientRect();
 
     card = document.createElement("div");
@@ -1179,6 +1206,7 @@
     const extractEl = card.querySelector(".x");
     if (a.extractHtml) {
       renderFormattedText(extractEl, a.extractHtml);
+      hookBodyLinks(extractEl);
     } else {
       extractEl.textContent = a.extract;
     }
@@ -1207,8 +1235,12 @@
 
       const showLead = () => {
         extractEl.replaceChildren();
-        if (a.extractHtml) renderFormattedText(extractEl, a.extractHtml);
-        else extractEl.textContent = a.extract;
+        if (a.extractHtml) {
+          renderFormattedText(extractEl, a.extractHtml);
+          hookBodyLinks(extractEl);
+        } else {
+          extractEl.textContent = a.extract;
+        }
         subtEl?.remove();
         subtEl = null;
         overviewChip?.remove();
@@ -1220,6 +1252,7 @@
       const showSection = (section, html) => {
         extractEl.replaceChildren();
         renderFormattedText(extractEl, html);
+        hookBodyLinks(extractEl);
         if (!subtEl) {
           subtEl = document.createElement("p");
           subtEl.className = "subt";
@@ -1344,11 +1377,17 @@
     // narrower than the card, so it always fits
     const scale = Math.min(1, (host.width - 16) / 500, (innerWidth - 24) / 500);
     if (scale < 1) card.style.zoom = scale;
-    const w = 500 * scale;
-    let left = range.left - host.left + range.width / 2 - w / 2;
-    left = Math.max(8, Math.min(left, host.width - w - 8));
-    card.style.left = left / (scale || 1) + "px";
-    card.style.top = (range.bottom - host.top + 10) / (scale || 1) + "px";
+    if (fixedPos) {
+      // an in-popup navigation re-renders at the same spot
+      card.style.left = fixedPos.left;
+      card.style.top = fixedPos.top;
+    } else {
+      const w = 500 * scale;
+      let left = range.left - host.left + range.width / 2 - w / 2;
+      left = Math.max(8, Math.min(left, host.width - w - 8));
+      card.style.left = left / (scale || 1) + "px";
+      card.style.top = (range.bottom - host.top + 10) / (scale || 1) + "px";
+    }
   }
 
   function removeCard(animate = true) {

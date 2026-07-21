@@ -260,7 +260,10 @@
     pinAll(".facts, .footer, .sections", { "border-color": theme.divider });
     pinAll(".facts .fl, .link, .sections .sl", { color: theme.link });
     pinAll(".facts .fv a", { color: theme.text });
-    pinAll(".extract a", { color: theme.link });
+    pinAll(".extract a", {
+      color: theme.text,
+      "border-color": theme.border,
+    });
     pinAll(".sections a", {
       color: theme.text,
       background: "transparent",
@@ -508,18 +511,16 @@
       .extract p:last-child { margin-bottom: 0; }
       .extract ul, .extract ol { margin: 0 0 8px; padding-left: 20px; }
       .extract li { margin: 0 0 4px; }
+      /* body links stay quiet: text-colored with a faint dotted underline,
+         waking up to the link color on hover */
       .extract a {
-        color: ${theme.link};
+        color: inherit;
         text-decoration: none;
+        border-bottom: 1px dotted ${theme.border};
       }
-      .extract a:hover { text-decoration: underline; }
-      /* small outward arrow marks that the link leaves for Wikipedia */
-      .extract a::after {
-        content: "↗";
-        font-size: 0.7em;
-        opacity: 0.7;
-        margin-left: 1px;
-        vertical-align: super;
+      .extract a:hover {
+        color: ${theme.link};
+        border-bottom-color: ${theme.link};
       }
       .extract h3, .extract h4 {
         font-size: ${size.text + 1}px;
@@ -1069,6 +1070,12 @@
               a.href = absolute;
               a.target = "_blank";
               a.rel = "noopener noreferrer";
+              // wiki article links preview in the popup, like fact links;
+              // modifier clicks and non-article links keep the new tab
+              if (isWikiArticleHref(absolute)) {
+                a.addEventListener("mousedown", (e) => e.preventDefault());
+                a.addEventListener("click", (e) => handleFactLinkClick(e, a));
+              }
               dstParent.appendChild(a);
               walk(node, a);
             } else {
@@ -1213,7 +1220,7 @@
     const title = wikiTitleFromHref(a.href);
     if (!title) return;
     e.preventDefault();
-    navigateInPlace(title);
+    navigateInPlace(title, a.href);
   }
 
   // Shared in-place navigation used by both disambiguation options and wiki
@@ -1221,7 +1228,7 @@
   // current position, pushing the article that was showing onto the history
   // stack first so the back button can return to it. On failure the current
   // card is left as-is (no request in flight to undo).
-  function navigateInPlace(title) {
+  function navigateInPlace(title, fallbackHref = null) {
     if (!popupHost) return;
     const { left, top } = currentPopupPagePosition();
     const fromArticle = currentArticle;
@@ -1232,7 +1239,12 @@
       (response) => {
         if (chrome.runtime.lastError) return;
         if (seq !== requestSeq) return;
-        if (!response?.ok) return;
+        if (!response?.ok) {
+          // an unpreviewable target (File:, Help:, a redlink) still lands
+          // somewhere useful instead of a dead click
+          if (fallbackHref) window.open(fallbackHref, "_blank", "noopener");
+          return;
+        }
         if (fromArticle) historyStack.push({ article: fromArticle, left, top });
         renderPopup(response.data, { left, top });
       }
