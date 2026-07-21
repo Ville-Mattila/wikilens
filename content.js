@@ -132,7 +132,7 @@
     lookupId, facts, images, audioUrl, fullExtractHtml, sections,
   }) {
     if (!popupHost || !popupCard || !currentArticle) return;
-    if (currentArticle.disambiguation) return;
+    if (currentArticle.disambiguation || currentArticle.sectionView) return;
     if (currentArticle.lookupId !== lookupId) return;
 
     currentArticle.facts = facts;
@@ -156,10 +156,7 @@
     if (sections?.length && !card.querySelector(".sections")) {
       const anchor =
         card.querySelector(".facts") ?? card.querySelector(".footer");
-      card.insertBefore(
-        buildSectionsBlock(sections, currentArticle.pageUrl),
-        anchor
-      );
+      card.insertBefore(buildSectionsBlock(currentArticle), anchor);
     }
 
     if (images?.length > 1 && !card.querySelector(".imgnav")) {
@@ -508,6 +505,13 @@
       }
       .extract p { margin: 0 0 8px; }
       .extract p:last-child { margin-bottom: 0; }
+      .extract ul, .extract ol { margin: 0 0 8px; padding-left: 20px; }
+      .extract li { margin: 0 0 4px; }
+      .extract h3, .extract h4 {
+        font-size: ${size.text + 1}px;
+        font-weight: 700;
+        margin: 10px 0 6px;
+      }
       .extractwrap { position: relative; }
       /* a soft fade at the text's lower edge while there is more to read */
       .fadeout {
@@ -742,6 +746,12 @@
     if (typeof article.audioUrl === "string" && article.audioUrl) {
       title.appendChild(buildAudioButton(article.audioUrl));
     }
+    let subtitle = null;
+    if (article.subtitle) {
+      subtitle = document.createElement("p");
+      subtitle.className = "subtitle";
+      subtitle.textContent = article.subtitle;
+    }
     const extract = document.createElement("div");
     extract.className = "extract";
     const bodyHtml = article.fullExtractHtml ?? article.extractHtml;
@@ -756,11 +766,15 @@
     fade.className = "fadeout";
     extractWrap.append(extract, fade);
     attachScrollFade(extract, fade);
-    body.append(title, extractWrap);
+    if (subtitle) {
+      body.append(title, subtitle, extractWrap);
+    } else {
+      body.append(title, extractWrap);
+    }
     card.appendChild(body);
 
     if (article.sections?.length) {
-      card.appendChild(buildSectionsBlock(article.sections, article.pageUrl));
+      card.appendChild(buildSectionsBlock(article));
     }
     if (article.facts?.length) {
       card.appendChild(buildFactsBlock(article.facts));
@@ -848,24 +862,78 @@
     requestAnimationFrame(update);
   }
 
-  // "In this article": the article's top-level sections as chips that open
-  // Wikipedia at that exact section in a new tab.
-  function buildSectionsBlock(sections, pageUrl) {
+  // "In this article": the article's top-level sections as chips. A plain
+  // click opens the section right in the popup; Ctrl/Cmd/Shift-click (or a
+  // section we can't fetch) falls back to Wikipedia in a new tab.
+  function buildSectionsBlock(article) {
     const block = document.createElement("div");
     block.className = "sections";
     const label = document.createElement("span");
     label.className = "sl";
     label.textContent = "In this article";
     block.appendChild(label);
-    for (const section of sections) {
+    const basePageUrl = article.basePageUrl ?? article.pageUrl;
+    for (const section of article.sections) {
       const a = document.createElement("a");
-      a.href = `${pageUrl}#${section.anchor}`;
+      a.href = `${basePageUrl}#${section.anchor}`;
       a.target = "_blank";
       a.rel = "noopener noreferrer";
       a.textContent = section.title;
+      if (section.index) {
+        a.addEventListener("mousedown", (e) => e.preventDefault());
+        a.addEventListener("click", (e) => {
+          if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+          e.preventDefault();
+          loadSection(article, section, a);
+        });
+      }
       block.appendChild(a);
     }
     return block;
+  }
+
+  // Fetches a section's content and shows it in the popup as a section
+  // view: same card, section name as the subtitle, chips still available
+  // for hopping onward, back button returning here. If the fetch fails the
+  // chip opens Wikipedia instead, so the click never dies silently.
+  function loadSection(article, section, chip) {
+    if (!popupHost) return;
+    const { left, top } = currentPopupPagePosition();
+    const fromArticle = currentArticle;
+    chip.style.opacity = "0.5";
+
+    const seq = ++requestSeq;
+    chrome.runtime.sendMessage(
+      {
+        type: "wikilens-section",
+        pageTitle: article.title,
+        index: section.index,
+        lang: article.lang ?? "en",
+      },
+      (response) => {
+        chip.style.opacity = "";
+        if (chrome.runtime.lastError) return;
+        if (seq !== requestSeq) return;
+        if (!response?.ok) {
+          window.open(chip.href, "_blank", "noopener");
+          return;
+        }
+        const basePageUrl = article.basePageUrl ?? article.pageUrl;
+        const sectionArticle = {
+          sectionView: true,
+          title: article.title,
+          subtitle: section.title,
+          extractHtml: response.html,
+          sections: article.sections,
+          lang: article.lang,
+          lookupId: article.lookupId,
+          basePageUrl,
+          pageUrl: `${basePageUrl}#${section.anchor}`,
+        };
+        if (fromArticle) historyStack.push({ article: fromArticle, left, top });
+        renderPopup(sectionArticle, { left, top });
+      }
+    );
   }
 
   // The quick-facts grid. Used when building a card and again when
@@ -943,7 +1011,17 @@
   // whitelist: only inline formatting tags and paragraphs survive, with all
   // attributes dropped; anything else is unwrapped to its text content.
   // Remote HTML never reaches innerHTML.
-  const FORMAT_TAGS = new Set(["B", "I", "EM", "STRONG", "SUB", "SUP", "SPAN", "P"]);
+  const FORMAT_TAGS = new Set([
+    "B", "I", "EM", "STRONG", "SUB", "SUP", "SPAN", "P",
+    "UL", "OL", "LI", "H3", "H4",
+  ]);
+  // Wikipedia chrome that must vanish entirely (not even as text): edit
+  // links, citation markers, reference lists, boxes, tables, media.
+  const SKIP_TAGS = new Set([
+    "SCRIPT", "STYLE", "LINK", "TABLE", "FIGURE", "IMG", "H2",
+  ]);
+  const SKIP_CLASSES =
+    /(^|\s)(mw-editsection|reference|references|noprint|navbox|hatnote|infobox|thumb|gallery|metadata|mw-empty-elt)(\s|$)/;
 
   function renderFormattedText(target, html) {
     const doc = new DOMParser().parseFromString(html, "text/html");
@@ -952,8 +1030,9 @@
         if (node.nodeType === Node.TEXT_NODE) {
           dstParent.appendChild(document.createTextNode(node.nodeValue));
         } else if (node.nodeType === Node.ELEMENT_NODE) {
-          // TextExtracts emits placeholder paragraphs with no text; keeping
-          // them would add phantom margins between real paragraphs
+          if (SKIP_TAGS.has(node.tagName)) continue;
+          if (SKIP_CLASSES.test(node.className?.baseVal ?? node.className ?? "")) continue;
+          // placeholder paragraphs with no text would add phantom margins
           if (node.tagName === "P" && !node.textContent.trim()) continue;
           if (FORMAT_TAGS.has(node.tagName)) {
             const el = document.createElement(node.tagName.toLowerCase());

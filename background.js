@@ -66,18 +66,46 @@ const API_HEADERS = {
 };
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== "wikilens-lookup") return;
+  if (message?.type === "wikilens-lookup") {
+    const senderKey = sender.tab?.id ?? "extension";
+    lookupArticle(message.title, senderKey, sender.tab?.id)
+      .then((data) => {
+        sendResponse({ ok: true, data });
+        if (!data?.disambiguation) recordRecent(data); // fire-and-forget
+      })
+      .catch(() => sendResponse({ ok: false }));
+    return true; // keep the message channel open for the async response
+  }
 
-  const senderKey = sender.tab?.id ?? "extension";
-  lookupArticle(message.title, senderKey, sender.tab?.id)
-    .then((data) => {
-      sendResponse({ ok: true, data });
-      if (!data?.disambiguation) recordRecent(data); // fire-and-forget
-    })
-    .catch(() => sendResponse({ ok: false }));
-
-  return true; // keep the message channel open for the async response
+  if (message?.type === "wikilens-section") {
+    fetchSectionHtml(message.pageTitle, message.index, message.lang)
+      .then((html) =>
+        html ? sendResponse({ ok: true, html }) : sendResponse({ ok: false })
+      )
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
 });
+
+// One section's rendered HTML, for viewing right in the popup. Cached in
+// the same lookup cache (sections rarely change within a session).
+async function fetchSectionHtml(pageTitle, index, lang) {
+  const cacheKey = `section|${lang}|${index}|${pageTitle.toLowerCase()}`;
+  const cached = lookupCache.get(cacheKey);
+  if (cached && cached !== CACHE_MISS) return cached;
+
+  const res = await fetch(
+    `https://${lang}.wikipedia.org/w/api.php?action=parse` +
+      `&page=${encodeURIComponent(pageTitle)}&prop=text` +
+      `&section=${encodeURIComponent(index)}&format=json&formatversion=2&origin=*`,
+    { headers: API_HEADERS }
+  );
+  if (!res.ok) return null;
+  const html = (await res.json()).parse?.text;
+  if (typeof html !== "string" || !html.trim()) return null;
+  cacheSet(cacheKey, html);
+  return html;
+}
 
 // Keyboard shortcut: ask the content script on the active tab to look up
 // the current text selection. Fire-and-forget — chrome:// and other
@@ -165,7 +193,8 @@ async function lookupArticle(title, senderKey = "extension", tabId = null) {
         });
 
         const lookupId = ++lookupSeq;
-        const result = { ...core, lookupId };
+        // lang rides along so the popup can fetch sections from the same wiki
+        const result = { ...core, lookupId, lang };
         if (!result.disambiguation) {
           result.images = result.thumbnail ? [result.thumbnail] : [];
           result.facts = [];
@@ -258,6 +287,9 @@ async function fetchSections(title, lang, signal) {
     const sections = [];
     for (const s of all) {
       if (s.toclevel !== 1 || !s.anchor) continue;
+      // transcluded sections have non-numeric indexes and can't be fetched
+      // from this page; they stay plain links in the popup
+      const index = /^\d+$/.test(String(s.index)) ? String(s.index) : null;
       // no DOM in a service worker: strip tags and the common entities
       const line = String(s.line)
         .replace(/<[^>]*>/g, "")
@@ -265,7 +297,7 @@ async function fetchSections(title, lang, signal) {
         .replace(/&nbsp;/g, " ")
         .trim();
       if (!line || BOILERPLATE_SECTIONS.test(line)) continue;
-      sections.push({ title: line, anchor: s.anchor });
+      sections.push({ title: line, anchor: s.anchor, index });
       if (sections.length >= 6) break;
     }
     return sections;

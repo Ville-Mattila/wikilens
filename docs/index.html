@@ -520,6 +520,19 @@
   }
   .wl-card .x p { margin: 0 0 8px; }
   .wl-card .x p:last-child { margin-bottom: 0; }
+  .wl-card .x ul, .wl-card .x ol { margin: 0 0 8px; padding-left: 20px; }
+  .wl-card .x li { margin: 0 0 4px; }
+  .wl-card .x h3, .wl-card .x h4 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 10px 0 6px;
+  }
+  .wl-card .subt {
+    font-size: 13px;
+    color: var(--card-text);
+    opacity: 0.7;
+    margin: 0 0 8px;
+  }
   .wl-card .xwrap { position: relative; }
   .wl-card .fadeout {
     position: absolute;
@@ -903,7 +916,15 @@
 
   // Wikipedia's extract_html rendered through a strict whitelist - inline
   // formatting and paragraphs only, all attributes dropped, nothing else.
-  const FORMAT_TAGS = new Set(["B", "I", "EM", "STRONG", "SUB", "SUP", "SPAN", "P"]);
+  const FORMAT_TAGS = new Set([
+    "B", "I", "EM", "STRONG", "SUB", "SUP", "SPAN", "P",
+    "UL", "OL", "LI", "H3", "H4",
+  ]);
+  const SKIP_TAGS = new Set([
+    "SCRIPT", "STYLE", "LINK", "TABLE", "FIGURE", "IMG", "H2",
+  ]);
+  const SKIP_CLASSES =
+    /(^|\s)(mw-editsection|reference|references|noprint|navbox|hatnote|infobox|thumb|gallery|metadata|mw-empty-elt)(\s|$)/;
   function renderFormattedText(target, html) {
     const doc = new DOMParser().parseFromString(html, "text/html");
     (function walk(srcParent, dstParent) {
@@ -911,6 +932,8 @@
         if (node.nodeType === Node.TEXT_NODE) {
           dstParent.appendChild(document.createTextNode(node.nodeValue));
         } else if (node.nodeType === Node.ELEMENT_NODE) {
+          if (SKIP_TAGS.has(node.tagName)) continue;
+          if (SKIP_CLASSES.test(node.className?.baseVal ?? node.className ?? "")) continue;
           if (node.tagName === "P" && !node.textContent.trim()) continue;
           if (FORMAT_TAGS.has(node.tagName)) {
             const el = document.createElement(node.tagName.toLowerCase());
@@ -922,6 +945,23 @@
         }
       }
     })(doc.body, target);
+  }
+
+  // One section's rendered HTML for the in-popup section view.
+  async function fetchSectionHtml(pageTitle, index) {
+    try {
+      const res = await fetch(
+        "https://en.wikipedia.org/w/api.php?action=parse" +
+        "&page=" + encodeURIComponent(pageTitle) + "&prop=text" +
+        "&section=" + encodeURIComponent(index) +
+        "&format=json&formatversion=2&origin=*"
+      );
+      if (!res.ok) return null;
+      const html = (await res.json()).parse?.text;
+      return typeof html === "string" && html.trim() ? html : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   // Top-level section titles with anchors for the "In this article" chips.
@@ -939,9 +979,10 @@
       const sections = [];
       for (const s of all) {
         if (s.toclevel !== 1 || !s.anchor) continue;
+        const index = /^\d+$/.test(String(s.index)) ? String(s.index) : null;
         const line = String(s.line).replace(/<[^>]*>/g, "").trim();
         if (!line || BOILERPLATE_SECTIONS.test(line)) continue;
-        sections.push({ title: line, anchor: s.anchor });
+        sections.push({ title: line, anchor: s.anchor, index });
         if (sections.length >= 6) break;
       }
       return sections;
@@ -1123,12 +1164,63 @@
       label.className = "sl";
       label.textContent = "In this article";
       block.appendChild(label);
+
+      const titleEl = card.querySelector(".t");
+      let subtEl = null;
+      let overviewChip = null;
+
+      const showLead = () => {
+        extractEl.replaceChildren();
+        if (a.extractHtml) renderFormattedText(extractEl, a.extractHtml);
+        else extractEl.textContent = a.extract;
+        subtEl?.remove();
+        subtEl = null;
+        overviewChip?.remove();
+        overviewChip = null;
+        extractEl.scrollTop = 0;
+        requestAnimationFrame(updateFade);
+      };
+
+      const showSection = (section, html) => {
+        extractEl.replaceChildren();
+        renderFormattedText(extractEl, html);
+        if (!subtEl) {
+          subtEl = document.createElement("p");
+          subtEl.className = "subt";
+          titleEl.after(subtEl);
+        }
+        subtEl.textContent = section.title;
+        if (!overviewChip) {
+          overviewChip = document.createElement("a");
+          overviewChip.href = a.url;
+          overviewChip.textContent = "← Overview";
+          overviewChip.addEventListener("click", (e) => {
+            e.preventDefault();
+            showLead();
+          });
+          label.after(overviewChip);
+        }
+        extractEl.scrollTop = 0;
+        requestAnimationFrame(updateFade);
+      };
+
       for (const section of a.sections) {
         const link = document.createElement("a");
         link.href = `${a.url}#${section.anchor}`;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         link.textContent = section.title;
+        if (section.index) {
+          link.addEventListener("click", async (e) => {
+            if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+            e.preventDefault();
+            link.style.opacity = "0.5";
+            const html = await fetchSectionHtml(a.title, section.index);
+            link.style.opacity = "";
+            if (html) showSection(section, html);
+            else window.open(link.href, "_blank", "noopener");
+          });
+        }
         block.appendChild(link);
       }
       card.insertBefore(block, card.querySelector(".f"));
