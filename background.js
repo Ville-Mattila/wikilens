@@ -307,20 +307,21 @@ async function fetchSections(title, lang, signal) {
   }
 }
 
-// The summary API only carries the first paragraph; TextExtracts with
-// exintro returns the article's whole lead section (everything before the
-// first heading) as limited HTML. Best-effort: null keeps the summary text.
+// The summary API only carries the first paragraph, and TextExtracts strips
+// links. Parsing section 0 gives the whole lead WITH its article links; the
+// popup's sanitizer drops the infobox, images, and other chrome that ride
+// along. Best-effort: null keeps the summary text.
 async function fetchLeadSection(title, lang, signal) {
   try {
     const res = await fetch(
-      `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts` +
-        `&exintro=1&titles=${encodeURIComponent(title)}` +
+      `https://${lang}.wikipedia.org/w/api.php?action=parse` +
+        `&page=${encodeURIComponent(title)}&prop=text&section=0` +
         "&format=json&formatversion=2&origin=*",
       { signal, headers: API_HEADERS }
     );
     if (!res.ok) return null;
-    const extract = (await res.json()).query?.pages?.[0]?.extract;
-    return typeof extract === "string" && extract.trim() ? extract : null;
+    const html = (await res.json()).parse?.text;
+    return typeof html === "string" && html.trim() ? html : null;
   } catch (err) {
     if (err?.name === "AbortError") throw err;
     return null;

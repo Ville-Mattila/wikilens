@@ -522,6 +522,18 @@
   .wl-card .x p:last-child { margin-bottom: 0; }
   .wl-card .x ul, .wl-card .x ol { margin: 0 0 8px; padding-left: 20px; }
   .wl-card .x li { margin: 0 0 4px; }
+  .wl-card .x a {
+    color: var(--card-link);
+    text-decoration: none;
+  }
+  .wl-card .x a:hover { text-decoration: underline; }
+  .wl-card .x a::after {
+    content: "97";
+    font-size: 0.7em;
+    opacity: 0.7;
+    margin-left: 1px;
+    vertical-align: super;
+  }
   .wl-card .x h3, .wl-card .x h4 {
     font-size: 15px;
     font-weight: 700;
@@ -924,7 +936,8 @@
     "SCRIPT", "STYLE", "LINK", "TABLE", "FIGURE", "IMG", "H2",
   ]);
   const SKIP_CLASSES =
-    /(^|\s)(mw-editsection|reference|references|noprint|navbox|hatnote|infobox|thumb|gallery|metadata|mw-empty-elt)(\s|$)/;
+    /(^|\s)(mw-editsection|reference|references|noprint|navbox|hatnote|infobox|thumb|gallery|metadata|mw-empty-elt|coordinates|ambox|sidebar)(\s|$)/;
+  const WIKI_BASE = "https://en.wikipedia.org";
   function renderFormattedText(target, html) {
     const doc = new DOMParser().parseFromString(html, "text/html");
     (function walk(srcParent, dstParent) {
@@ -935,6 +948,29 @@
           if (SKIP_TAGS.has(node.tagName)) continue;
           if (SKIP_CLASSES.test(node.className?.baseVal ?? node.className ?? "")) continue;
           if (node.tagName === "P" && !node.textContent.trim()) continue;
+          if (node.tagName === "A") {
+            const href = node.getAttribute("href") || "";
+            let absolute = null;
+            if (href && !href.startsWith("#")) {
+              try {
+                const url = new URL(href, WIKI_BASE);
+                if (url.protocol === "https:" || url.protocol === "http:") {
+                  absolute = url.href;
+                }
+              } catch (_) {}
+            }
+            if (absolute) {
+              const a = document.createElement("a");
+              a.href = absolute;
+              a.target = "_blank";
+              a.rel = "noopener noreferrer";
+              dstParent.appendChild(a);
+              walk(node, a);
+            } else {
+              walk(node, dstParent);
+            }
+            continue;
+          }
           if (FORMAT_TAGS.has(node.tagName)) {
             const el = document.createElement(node.tagName.toLowerCase());
             dstParent.appendChild(el);
@@ -996,13 +1032,13 @@
   async function fetchLeadSection(title) {
     try {
       const res = await fetch(
-        "https://en.wikipedia.org/w/api.php?action=query&prop=extracts" +
-        "&exintro=1&titles=" + encodeURIComponent(title) +
+        "https://en.wikipedia.org/w/api.php?action=parse" +
+        "&page=" + encodeURIComponent(title) + "&prop=text&section=0" +
         "&format=json&formatversion=2&origin=*"
       );
       if (!res.ok) return null;
-      const extract = (await res.json()).query?.pages?.[0]?.extract;
-      return typeof extract === "string" && extract.trim() ? extract : null;
+      const html = (await res.json()).parse?.text;
+      return typeof html === "string" && html.trim() ? html : null;
     } catch (_) {
       return null;
     }

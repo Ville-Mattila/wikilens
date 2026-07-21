@@ -148,7 +148,7 @@
     if (fullExtractHtml) {
       if (extract && extract.scrollTop === 0) {
         extract.replaceChildren();
-        renderFormattedText(extract, fullExtractHtml);
+        renderFormattedText(extract, fullExtractHtml, wikiBaseUrl(currentArticle));
       }
     }
     extract?._wlFadeUpdate?.(); // content may have grown past the cap
@@ -260,6 +260,7 @@
     pinAll(".facts, .footer, .sections", { "border-color": theme.divider });
     pinAll(".facts .fl, .link, .sections .sl", { color: theme.link });
     pinAll(".facts .fv a", { color: theme.text });
+    pinAll(".extract a", { color: theme.link });
     pinAll(".sections a", {
       color: theme.text,
       background: "transparent",
@@ -507,6 +508,19 @@
       .extract p:last-child { margin-bottom: 0; }
       .extract ul, .extract ol { margin: 0 0 8px; padding-left: 20px; }
       .extract li { margin: 0 0 4px; }
+      .extract a {
+        color: ${theme.link};
+        text-decoration: none;
+      }
+      .extract a:hover { text-decoration: underline; }
+      /* small outward arrow marks that the link leaves for Wikipedia */
+      .extract a::after {
+        content: "\\2197";
+        font-size: 0.7em;
+        opacity: 0.7;
+        margin-left: 1px;
+        vertical-align: super;
+      }
       .extract h3, .extract h4 {
         font-size: ${size.text + 1}px;
         font-weight: 700;
@@ -756,7 +770,7 @@
     extract.className = "extract";
     const bodyHtml = article.fullExtractHtml ?? article.extractHtml;
     if (bodyHtml) {
-      renderFormattedText(extract, bodyHtml);
+      renderFormattedText(extract, bodyHtml, wikiBaseUrl(article));
     } else {
       extract.textContent = article.extract;
     }
@@ -1021,9 +1035,9 @@
     "SCRIPT", "STYLE", "LINK", "TABLE", "FIGURE", "IMG", "H2",
   ]);
   const SKIP_CLASSES =
-    /(^|\s)(mw-editsection|reference|references|noprint|navbox|hatnote|infobox|thumb|gallery|metadata|mw-empty-elt)(\s|$)/;
+    /(^|\s)(mw-editsection|reference|references|noprint|navbox|hatnote|infobox|thumb|gallery|metadata|mw-empty-elt|coordinates|ambox|sidebar)(\s|$)/;
 
-  function renderFormattedText(target, html) {
+  function renderFormattedText(target, html, baseUrl) {
     const doc = new DOMParser().parseFromString(html, "text/html");
     (function walk(srcParent, dstParent) {
       for (const node of srcParent.childNodes) {
@@ -1034,6 +1048,34 @@
           if (SKIP_CLASSES.test(node.className?.baseVal ?? node.className ?? "")) continue;
           // placeholder paragraphs with no text would add phantom margins
           if (node.tagName === "P" && !node.textContent.trim()) continue;
+          if (node.tagName === "A") {
+            // keep article links: absolute against the source wiki,
+            // http(s) only, opening Wikipedia in a new tab. Anything else
+            // (fragments, odd schemes) unwraps to plain text.
+            const href = node.getAttribute("href") ?? "";
+            let absolute = null;
+            if (baseUrl && href && !href.startsWith("#")) {
+              try {
+                const url = new URL(href, baseUrl);
+                if (url.protocol === "https:" || url.protocol === "http:") {
+                  absolute = url.href;
+                }
+              } catch {
+                // unresolvable href: fall through to plain text
+              }
+            }
+            if (absolute) {
+              const a = document.createElement("a");
+              a.href = absolute;
+              a.target = "_blank";
+              a.rel = "noopener noreferrer";
+              dstParent.appendChild(a);
+              walk(node, a);
+            } else {
+              walk(node, dstParent);
+            }
+            continue;
+          }
           if (FORMAT_TAGS.has(node.tagName)) {
             const el = document.createElement(node.tagName.toLowerCase());
             dstParent.appendChild(el);
@@ -1044,6 +1086,10 @@
         }
       }
     })(doc.body, target);
+  }
+
+  function wikiBaseUrl(article) {
+    return `https://${article?.lang ?? "en"}.wikipedia.org`;
   }
 
   // Builds a toolbar button consistent with the others: square, transparent,
