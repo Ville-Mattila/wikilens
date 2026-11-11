@@ -58,9 +58,10 @@ first paragraph, quick facts, and a link to read on.
 > have previewed.
 >
 > PRIVATE BY DESIGN
-> Your selection travels to Wikimedia's APIs (Wikipedia and Wikidata) and
-> nowhere else. No analytics, no tracking, no accounts. Free software under
-> the GPL-3.0, source at github.com/Ville-Mattila/wikilens.
+> Your selection, or the title of a Wikipedia link you hover, travels to
+> Wikimedia's APIs (Wikipedia and Wikidata) and nowhere else. No analytics,
+> no tracking, no accounts. Free software under the GPL-3.0, source at
+> github.com/Ville-Mattila/wikilens.
 
 **Homepage:** https://ville-mattila.github.io/wikilens/
 **Privacy policy URL:** https://github.com/Ville-Mattila/wikilens/blob/main/PRIVACY.md
@@ -68,49 +69,50 @@ first paragraph, quick facts, and a link to read on.
 ## Single purpose description
 
 WikiLens has one purpose: showing a Wikipedia article preview for text the
-user selects on a web page.
+user selects, or a Wikipedia link the user hovers, on a web page.
 
 ## Permission justifications
 
 Paste these verbatim: both are under the dashboard's 1000-character limit.
 
-**Host permission justification (991 chars):**
+**Host permission justification (977 chars):**
 
-> WikiLens has a single purpose: when the user selects text on a page, it
-> shows a preview of the matching Wikipedia article. Broad host access is
-> required for both halves of this: (1) A content script must run on all
-> pages to listen for the user's text-selection gesture and render the
-> preview popup next to the selection. It activates only on an explicit
-> selection, reads only the selected text, and injects nothing except the
-> extension's own popup. activeTab is not viable, as it would require
-> clicking the toolbar icon before every lookup, defeating the select-and-see
-> purpose. (2) Access to https://*.wikipedia.org/* lets the service worker
-> query the Wikipedia REST API (/api/rest_v1/page/summary/) to check the
-> selected text against article titles and fetch the summary and thumbnail.
-> The subdomain wildcard is needed because each language edition the user can
-> choose in settings lives on its own subdomain (en.wikipedia.org,
+> WikiLens has a single purpose: showing a preview of a Wikipedia article
+> when the user selects its title, or rests the mouse on a link to it, on
+> any page. Broad host access is required for both halves of this: (1) A
+> content script must run on all pages to notice the user's text selection
+> or a hovered Wikipedia link and render the preview popup next to it. It
+> reads only the selected text or the hovered Wikipedia link's address,
+> ignores all other links, and injects nothing except the extension's own
+> popup. activeTab is not viable, as it would require clicking the toolbar
+> icon before every lookup, defeating the instant-preview purpose. (2)
+> Access to https://*.wikipedia.org/* lets the service worker query the
+> Wikipedia API to check the text against article titles and fetch the
+> summary and thumbnail. The subdomain wildcard is needed because each
+> language edition lives on its own subdomain (en.wikipedia.org,
 > fi.wikipedia.org, etc.). No other data is read or transmitted.
 
-**storage justification (647 chars):**
+**storage justification (696 chars):**
 
 > The storage permission saves the user's preferences via
 > chrome.storage.sync: Wikipedia language edition, popup size, theme,
-> trigger mode, exact-title matching mode, and the user's own list of sites
-> where the extension is disabled. It also keeps a device-local list of the
-> user's last 10 previewed articles (title and Wikipedia URL) via
-> chrome.storage.local, shown in the toolbar popup as recent lookups.
-> Nothing is transmitted anywhere: sync values stay within the user's own
-> Chrome profile sync, and the recents list never leaves the device. No
-> browsing history is recorded - only articles the user explicitly
-> previewed by selecting their titles.
+> trigger mode, link hover previews on or off, exact-title matching mode,
+> and the user's own list of sites where the extension is disabled. It also
+> keeps a device-local list of the user's last 10 previewed articles (title
+> and Wikipedia URL) via chrome.storage.local, shown in the toolbar popup as
+> recent lookups. Nothing is transmitted anywhere: sync values stay within
+> the user's own Chrome profile sync, and the recents list never leaves the
+> device. No browsing history is recorded - only articles the user
+> previewed by selecting their titles or hovering a Wikipedia link.
 
 ## Privacy practices tab answers
 
 - Single purpose: yes (see above).
 - Data usage → what user data do you collect?
-  - **Website content** (the user's selected text) - transmitted to the
-    Wikipedia API solely to look up the matching article. Not collected or
-    stored by the developer.
+  - **Website content** (the user's selected text, or the article title of
+    a Wikipedia link the user hovers) - transmitted to the Wikipedia API
+    solely to look up the matching article. Not collected or stored by the
+    developer.
   - Everything else (personally identifiable info, health, financial,
     authentication, communications, location, web history, user activity):
     **not collected**.
