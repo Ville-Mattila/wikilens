@@ -6,8 +6,8 @@ Everything needed to fill in the Developer Dashboard forms.
 
 **Name:** WikiLens
 
-**Summary (132 chars max, currently 130):**
-Select any text to instantly preview the matching Wikipedia article: images,
+**Summary (132 chars max, currently 132):**
+Select text or hover a Wikipedia link to instantly preview the article: images,
 first paragraph, quick facts, and a link to read on.
 
 **Category:** Productivity → Tools
