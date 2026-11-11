@@ -26,6 +26,11 @@ first paragraph, quick facts, and a link to read on.
 > to:" list, and clicking a meaning previews it in place. Prefer looser
 > matching? One switch also resolves redirects like "USA" to "United States".
 >
+> LINKS, TOO
+> Rest the mouse on any link to a Wikipedia article and the same preview
+> opens, in the link's own language. Move away and it closes. Click into it
+> and it stays. One switch turns hover previews off.
+>
 > QUICK FACTS AND RABBIT HOLES
 > The Large popup adds up to five facts from the article's infobox (born,
 > died, occupation, founded, population, website), shown in your language

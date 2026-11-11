@@ -37,6 +37,7 @@
     size: "medium",
     theme: "dark",
     trigger: "select",
+    hoverLinks: true,
     disabledSites: [],
   };
   chrome.storage.sync.get(settings, (stored) => {
@@ -44,6 +45,7 @@
       size: stored.size,
       theme: stored.theme,
       trigger: stored.trigger,
+      hoverLinks: stored.hoverLinks,
       disabledSites: stored.disabledSites,
     };
   });
@@ -52,6 +54,7 @@
     if (changes.size) settings.size = changes.size.newValue;
     if (changes.theme) settings.theme = changes.theme.newValue;
     if (changes.trigger) settings.trigger = changes.trigger.newValue;
+    if (changes.hoverLinks) settings.hoverLinks = changes.hoverLinks.newValue;
     if (changes.disabledSites) settings.disabledSites = changes.disabledSites.newValue;
   });
 
@@ -79,9 +82,17 @@
   // below — making text inside the popup impossible to select.
   let popupPointerDown = false;
 
+  // How the open popup came to be: "select" (text selection or shortcut),
+  // "hover" (resting on a Wikipedia link; closes when the pointer leaves),
+  // or "engaged" (a hover popup the user clicked into; now it stays until
+  // a click outside or Escape, like a selection popup).
+  let popupOrigin = null;
+
   document.addEventListener("mousedown", (e) => {
+    cancelHoverIntent();
     if (popupHost && e.composedPath().includes(popupHost)) {
       popupPointerDown = true;
+      if (popupOrigin === "hover") popupOrigin = "engaged";
       return;
     }
     popupPointerDown = false;
@@ -96,6 +107,8 @@
   document.addEventListener("selectionchange", () => {
     if (popupPointerDown) return;
     if (pinned) return;
+    // only selection popups live and die with the selection
+    if (popupOrigin !== "select") return;
     const sel = document.getSelection();
     if (popupHost && (!sel || sel.isCollapsed)) dismissPopup();
   });
@@ -110,7 +123,123 @@
   function dismissPopup() {
     pinned = false;
     historyStack = [];
+    popupOrigin = null;
+    clearTimeout(hoverHideTimer);
     removePopup();
+  }
+
+  // ---- Link hover previews ----
+  // Resting the mouse on a link to a Wikipedia article opens the same popup.
+  // The popup closes shortly after the pointer leaves both the link and the
+  // popup, unless the user clicked into it or pinned it.
+  const HOVER_DELAY_MS = 450; // intent delay: passing over a link does nothing
+  const HOVER_HIDE_MS = 300; // grace period for crossing the gap to the popup
+  const finePointer = matchMedia("(hover: hover) and (pointer: fine)");
+  let hoverLink = null; // the page link currently hovered with intent
+  let hoverPopupLink = null; // the link the open hover preview belongs to
+  let hoverPoint = null; // pointer position, to anchor on the right line
+  let hoverSavedTitle = null; // the link's tooltip, hidden while hovering
+  let hoverTimer = null;
+  let hoverHideTimer = null;
+
+  document.addEventListener("mouseover", (e) => {
+    if (popupHost && e.composedPath().includes(popupHost)) {
+      clearTimeout(hoverHideTimer); // reached the popup: keep it
+      return;
+    }
+    const link = e.target.closest?.("a[href]");
+    if (!link) return;
+    if (link === hoverLink) {
+      clearTimeout(hoverHideTimer);
+      return;
+    }
+    if (!settings.hoverLinks || !finePointer.matches) return;
+    // never replace a pinned popup or one opened by a selection
+    if (pinned || (popupHost && popupOrigin !== "hover")) return;
+    if (isDisabledSite() || link.isContentEditable) return;
+    const target = wikiLinkTarget(link.href);
+    if (!target) return;
+
+    // an open preview of a different link still closes on its own timer
+    cancelHoverIntent();
+    hoverLink = link;
+    hoverPoint = { x: e.clientX, y: e.clientY };
+    // the native tooltip would sit on top of the preview
+    if (link.hasAttribute("title")) {
+      hoverSavedTitle = link.getAttribute("title");
+      link.removeAttribute("title");
+    }
+    // back on the link whose preview is still open: just keep it
+    if (popupHost && popupOrigin === "hover" && link === hoverPopupLink) {
+      clearTimeout(hoverHideTimer);
+      return;
+    }
+    hoverTimer = setTimeout(() => lookupHoveredLink(link, target), HOVER_DELAY_MS);
+  });
+
+  document.addEventListener("mouseout", (e) => {
+    const to = e.relatedTarget;
+    if (popupHost && e.composedPath().includes(popupHost)) {
+      if (to && popupHost.contains(to)) return; // moving within the popup
+      scheduleHoverHide();
+      return;
+    }
+    if (!hoverLink || !e.composedPath().includes(hoverLink)) return;
+    if (to && hoverLink.contains(to)) return; // moving within the link
+    cancelHoverIntent();
+    scheduleHoverHide();
+  });
+
+  function scheduleHoverHide() {
+    if (popupOrigin !== "hover") return;
+    clearTimeout(hoverHideTimer);
+    hoverHideTimer = setTimeout(() => {
+      if (popupOrigin === "hover" && !pinned && !popupPointerDown) dismissPopup();
+    }, HOVER_HIDE_MS);
+  }
+
+  // Forgets the hovered link: stops a pending lookup and gives the link
+  // its tooltip back.
+  function cancelHoverIntent() {
+    clearTimeout(hoverTimer);
+    if (hoverLink && hoverSavedTitle !== null) {
+      hoverLink.setAttribute("title", hoverSavedTitle);
+    }
+    hoverLink = null;
+    hoverSavedTitle = null;
+  }
+
+  function lookupHoveredLink(link, target) {
+    const seq = ++requestSeq;
+    chrome.runtime.sendMessage(
+      { type: "wikilens-lookup", title: target.title, lang: target.lang, exact: false },
+      (response) => {
+        if (chrome.runtime.lastError) return;
+        if (seq !== requestSeq) return;
+        if (!response?.ok) return;
+        if (hoverLink !== link || !link.isConnected) return; // pointer moved on
+        if (pinned || (popupHost && popupOrigin !== "hover")) return;
+        const rect = hoveredLineRect(link);
+        if (!rect) return;
+        renderPopup(response.data, { rect });
+        popupOrigin = "hover";
+        hoverPopupLink = link;
+      }
+    );
+  }
+
+  // A link that wraps across lines has one box per line; anchor the popup
+  // to the line under the pointer rather than the whole wrapped block.
+  function hoveredLineRect(link) {
+    const rects = [...link.getClientRects()].filter((r) => r.width && r.height);
+    if (!rects.length) return null;
+    if (hoverPoint) {
+      const hit = rects.find(
+        (r) => hoverPoint.y >= r.top && hoverPoint.y <= r.bottom
+      );
+      if (hit) return hit;
+    }
+    return rects[0];
   }
 
   // The background worker sends this when the user presses the keyboard
@@ -324,7 +453,9 @@
   function showPopup(article) {
     const rect = selectionRect();
     if (!rect) return;
+    cancelHoverIntent(); // a selection takes over from any pending hover
     renderPopup(article, { rect });
+    popupOrigin = "select";
   }
 
   // Renders a popup either anchored to the current selection rect, or at a
@@ -1196,46 +1327,69 @@
     }
   }
 
-  // Derives a lookup title from a Wikipedia article URL: the path segment
-  // after "/wiki/", percent-decoded, with underscores turned back into
-  // spaces (Wikipedia's own title <-> URL convention).
-  function wikiTitleFromHref(href) {
-    const url = new URL(href, location.href);
-    const marker = "/wiki/";
-    const idx = url.pathname.indexOf(marker);
-    if (idx === -1) return null;
-    const encoded = url.pathname.slice(idx + marker.length);
+  // Pages that aren't articles (files, categories, talk, help...). English
+  // names only; other languages' namespaces simply fail the lookup quietly.
+  const NON_ARTICLE_NAMESPACE =
+    /^(special|file|image|media|category|talk|user|wikipedia|wp|help|portal|template|module|draft|mediawiki|timedtext|[a-z ]+ talk):/i;
+
+  // Parses a Wikipedia article URL (any language, desktop or mobile) into
+  // { title, lang }, or null for anything else. The title is the path
+  // segment after "/wiki/", percent-decoded, with underscores turned back
+  // into spaces (Wikipedia's own title <-> URL convention).
+  function wikiLinkTarget(href) {
+    if (typeof href !== "string") return null; // SVG links carry objects
+    let url;
     try {
-      return decodeURIComponent(encoded).replace(/_/g, " ");
+      url = new URL(href, location.href);
     } catch {
       return null;
     }
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    const host = url.hostname
+      .toLowerCase()
+      .match(/^([a-z][a-z0-9-]{1,15})(?:\.m)?\.wikipedia\.org$/);
+    if (!host || host[1] === "www") return null;
+    if (!url.pathname.startsWith("/wiki/")) return null;
+    let title;
+    try {
+      title = decodeURIComponent(url.pathname.slice(6)).replace(/_/g, " ").trim();
+    } catch {
+      return null;
+    }
+    if (!title || title.length > 255 || NON_ARTICLE_NAMESPACE.test(title)) {
+      return null;
+    }
+    return { title, lang: host[1] };
   }
 
   // Plain left-clicks on a wiki fact link navigate the popup in place;
   // ctrl/cmd/shift-clicks (and middle-clicks, which never fire "click")
-  // keep the browser's normal open-in-new-tab behavior.
+  // keep the browser's normal open-in-new-tab behavior, as do links to
+  // non-article pages.
   function handleFactLinkClick(e, a) {
     if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    const title = wikiTitleFromHref(a.href);
-    if (!title) return;
+    const target = wikiLinkTarget(a.href);
+    if (!target) return;
     e.preventDefault();
-    navigateInPlace(title, a.href);
+    navigateInPlace(target.title, a.href, target.lang);
   }
 
   // Shared in-place navigation used by both disambiguation options and wiki
   // fact links: looks up `title`, and on success re-renders at the popup's
   // current position, pushing the article that was showing onto the history
   // stack first so the back button can return to it. On failure the current
-  // card is left as-is (no request in flight to undo).
-  function navigateInPlace(title, fallbackHref = null) {
+  // card is left as-is (no request in flight to undo). A link's `lang`
+  // targets that link's wiki and follows redirects, like a hovered link.
+  function navigateInPlace(title, fallbackHref = null, lang = null) {
     if (!popupHost) return;
     const { left, top } = currentPopupPagePosition();
     const fromArticle = currentArticle;
 
     const seq = ++requestSeq;
+    const message = { type: "wikilens-lookup", title };
+    if (lang) Object.assign(message, { lang, exact: false });
     chrome.runtime.sendMessage(
-      { type: "wikilens-lookup", title },
+      message,
       (response) => {
         if (chrome.runtime.lastError) return;
         if (seq !== requestSeq) return;

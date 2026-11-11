@@ -16,6 +16,8 @@ A browser extension (Chromium and Firefox) that shows an instant Wikipedia previ
 4. The popup fades away when you click elsewhere, clear the selection, or press Esc.
 5. A small toolbar in the popup's footer lets you pin it open while you scroll and read (Esc still closes), drag it anywhere on the page, and copy a title-plus-link citation with one click.
 
+Links work too: rest the mouse on any link to a Wikipedia article and the same popup opens for it, in that link's language edition and following redirects. A hover preview closes when you move away from both the link and the popup. Click into it and it stays until you click elsewhere or press Esc.
+
 Press Ctrl+Shift+L (Cmd+Shift+L on Mac) to preview the current selection on demand. The shortcut works even in Alt+select mode, on disabled sites, and inside text fields, since pressing it is an unambiguous request.
 
 Redirects (e.g. "USA") don't trigger the popup by default; only exact article titles like "United States" or "Albert Einstein" do (a setting relaxes this). Matching is case-insensitive, mirroring MediaWiki's own title normalization. Disambiguation titles show a "may refer to:" list, and clicking a meaning previews it in place. If a title doesn't exist in your chosen language edition, English Wikipedia is tried automatically. Lookups never fire inside inputs, textareas, or rich-text editors, results are cached, and all animations respect `prefers-reduced-motion`.
@@ -43,6 +45,7 @@ Click the gear in the toolbar popup, or right-click the WikiLens icon → **Opti
 - **Popup size**: Small, Medium, or Large. Small is compact; Medium and Large share roomier dimensions, and Large additionally shows the quick facts block.
 - **Theme**: Light, Dark, or Auto (follows the OS preference). Default: Dark.
 - **Trigger**: On select (default), or Alt + select for popups only when you ask.
+- **Preview Wikipedia links on hover**: on by default. Turn off to preview selections only.
 - **Exact title matches only**: when on (default), the preview appears only if the selection is exactly an article's title. Turn off to also follow Wikipedia redirects, e.g. selecting "USA" previews "United States".
 - **Disabled sites**: hostnames (one per line, subdomains included) where WikiLens stays quiet.
 
@@ -53,7 +56,7 @@ Every Wikipedia article links a Wikidata entity. For the Large popup, the servic
 ## Files
 
 - `manifest.json`: Manifest V3 config; content script on all pages (except Wikipedia itself), host permission for `*.wikipedia.org`, `storage` permission for settings.
-- `content.js`: selection tracking, popup rendering (shadow DOM, so page CSS can't interfere), entrance/exit animations, positioning, size/theme application.
+- `content.js`: selection and link-hover tracking, popup rendering (shadow DOM, so page CSS can't interfere), entrance/exit animations, positioning, size/theme application.
 - `background.js`: service worker performing the Wikipedia lookup and the Wikidata quick-facts resolution, avoiding page-level CORS/CSP restrictions.
 - `options.html` / `options.js`: the settings page.
 - `action.html` / `action.js`: the toolbar popup (recent lookups + title search).

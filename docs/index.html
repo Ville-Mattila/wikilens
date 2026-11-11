@@ -359,6 +359,12 @@
     transition: background 0.25s ease;
   }
   .demo .term:hover { background: var(--highlight); }
+  .demo a.wikilink {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
   /* once the demo scrolls into view, the first term glows briefly:
      a wordless "start here" */
   .demo.inview .dropcap .term:first-of-type {
@@ -768,9 +774,10 @@
 
   <section class="section" id="try">
     <div class="section-head"><span class="no">§ 1</span><h2>Try it on this very page</h2></div>
-    <p class="demo-hint">Select any dotted term below. This demo calls the
-      real Wikipedia and Wikidata APIs, exactly like the extension does.
-      Shown at the Large size, quick facts included.</p>
+    <p class="demo-hint">Select any dotted term below, or rest the mouse on a
+      link. This demo calls the real Wikipedia and Wikidata APIs, exactly
+      like the extension does. Shown at the Large size, quick facts
+      included.</p>
     <div class="demo" id="demo">
       <p class="dropcap">When <span class="term">Albert Einstein</span> published his theory of
         relativity, the speed of light became the universe's one fixed rule.
@@ -781,6 +788,11 @@
       <p>Every dotted phrase is an exact Wikipedia article title. Select one,
         or select something that isn't an article, and notice how WikiLens
         politely stays out of your way.</p>
+      <p>Links to Wikipedia preview on hover: rest the mouse on the
+        <a class="wikilink" href="https://en.wikipedia.org/wiki/Aurora_borealis" target="_blank" rel="noopener">aurora borealis</a>
+        or the
+        <a class="wikilink" href="https://en.wikipedia.org/wiki/Speed_of_light" target="_blank" rel="noopener">speed of light</a>
+        and the preview opens. Move away and it closes again.</p>
       <div class="demo-status" id="demo-status"></div>
     </div>
   </section>
@@ -792,7 +804,8 @@
         <h3><span class="fig">fig. a</span>Exact by default</h3>
         <p>A preview appears only when your selection is precisely an article's
           title. Ambiguous titles offer a tidy “may refer to:” list, and
-          redirects like “USA” resolve with one switch.</p>
+          redirects like “USA” resolve with one switch. Links to Wikipedia
+          preview too: just rest the mouse on one.</p>
       </div>
       <div class="feature">
         <h3><span class="fig">fig. b</span>23 languages</h3>
@@ -809,8 +822,9 @@
       </div>
       <div class="feature">
         <h3><span class="fig">fig. d</span>Private by design</h3>
-        <p>Your selection travels to Wikimedia's APIs (Wikipedia and
-          Wikidata) and nowhere else. No analytics, no tracking, nothing
+        <p>Your selection, or the title of a Wikipedia link you hover,
+          travels to Wikimedia's APIs (Wikipedia and Wikidata) and nowhere
+          else. No analytics, no tracking, nothing
           sold. The code is open for inspection.</p>
       </div>
     </div>
@@ -828,7 +842,8 @@
       <li>Tinkerers: clone
         <a href="https://github.com/Ville-Mattila/wikilens">the source</a>
         and load it unpacked via <code>chrome://extensions</code>.</li>
-      <li>Select some text anywhere, or press Ctrl+Shift+L. That's it.</li>
+      <li>Select some text anywhere, hover a Wikipedia link, or press
+        Ctrl+Shift+L. That's it.</li>
     </ol>
   </section>
 
@@ -856,7 +871,13 @@
     setTimeout(onSelect, 10);
   });
   document.addEventListener("mousedown", (e) => {
-    if (card && !card.contains(e.target)) removeCard();
+    clearTimeout(hoverTimer);
+    hoverLink = null;
+    if (card && card.contains(e.target)) {
+      if (cardOrigin === "hover") cardOrigin = "engaged";
+      return;
+    }
+    if (card) removeCard();
   });
 
   async function onSelect() {
@@ -877,11 +898,81 @@
       return;
     }
     status.textContent = "";
+    clearTimeout(hoverTimer); // a selection takes over from a pending hover
+    hoverLink = null;
     showCard(data, sel);
+    cardOrigin = "select";
   }
 
-  async function lookup(title) {
-    const key = title.toLowerCase();
+  // Link hover previews, like the extension: resting on a Wikipedia link
+  // opens its card; it closes shortly after the pointer leaves both link
+  // and card, unless the user clicked into it ("engaged").
+  const finePointer = matchMedia("(hover: hover) and (pointer: fine)");
+  let cardOrigin = null; // "select" | "hover" | "engaged"
+  let cardLink = null; // the link the open hover card belongs to
+  let hoverLink = null;
+  let hoverY = 0;
+  let hoverTimer = null;
+  let hideTimer = null;
+
+  demo.addEventListener("mouseover", (e) => {
+    if (card && card.contains(e.target)) {
+      clearTimeout(hideTimer);
+      return;
+    }
+    const link = e.target.closest("a.wikilink");
+    if (!link || link === hoverLink || !finePointer.matches) return;
+    if (card && cardOrigin !== "hover") return; // never replace a reader's card
+    clearTimeout(hoverTimer);
+    hoverLink = link;
+    hoverY = e.clientY;
+    if (card && link === cardLink) {
+      clearTimeout(hideTimer); // back on the link whose card is open
+      return;
+    }
+    hoverTimer = setTimeout(async () => {
+      const mySeq = ++seq;
+      const data = await lookup(titleFromWikiHref(link.href), false);
+      if (mySeq !== seq || hoverLink !== link || !data) return;
+      if (card && cardOrigin !== "hover") return;
+      // a wrapped link has a box per line: anchor to the hovered one
+      const rects = [...link.getClientRects()];
+      const rect = rects.find((r) => hoverY >= r.top && hoverY <= r.bottom) ||
+        rects[0];
+      status.textContent = "";
+      showCard(data, rect);
+      cardOrigin = "hover";
+      cardLink = link;
+    }, 450);
+  });
+
+  demo.addEventListener("mouseout", (e) => {
+    const to = e.relatedTarget;
+    if (card && card.contains(e.target)) {
+      if (to && card.contains(to)) return;
+      scheduleHide();
+      return;
+    }
+    if (hoverLink && hoverLink.contains(e.target)) {
+      if (to && hoverLink.contains(to)) return;
+      clearTimeout(hoverTimer);
+      hoverLink = null;
+      scheduleHide();
+    }
+  });
+
+  function scheduleHide() {
+    if (cardOrigin !== "hover") return;
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      if (cardOrigin === "hover") removeCard();
+    }, 300);
+  }
+
+  // exact: selections must name the article itself; links (exact = false)
+  // follow redirects, since they point at a real page
+  async function lookup(title, exact = true) {
+    const key = (exact ? "" : "link:") + title.toLowerCase();
     if (cache.has(key)) return cache.get(key);
     let result = null;
     try {
@@ -891,8 +982,8 @@
       );
       if (res.ok) {
         const d = await res.json();
-        if (d.type === "standard" &&
-            d.title.toLowerCase() === title.trim().toLowerCase()) {
+        if (d.type === "standard" && (!exact ||
+            d.title.toLowerCase() === title.trim().toLowerCase())) {
           let thumb = d.thumbnail ? d.thumbnail.source : null;
           const ow = d.originalimage ? d.originalimage.width : 0;
           if (thumb && ow > 960) {
@@ -1184,16 +1275,19 @@
         e.preventDefault();
         if (!card) return;
         const pos = { left: card.style.left, top: card.style.top };
-        const res = await lookup(title);
+        const res = await lookup(title, false);
         if (res) showCard(res, null, pos);
         else window.open(a.href, "_blank", "noopener");
       });
     }
   }
 
-  function showCard(a, sel, fixedPos) {
+  // anchor: a Selection, or a DOMRect (a hovered link's line)
+  function showCard(a, anchor, fixedPos) {
     removeCard(false); // replace instantly, no exit animation overlap
-    const range = fixedPos ? null : sel.getRangeAt(0).getBoundingClientRect();
+    const range = fixedPos ? null
+      : anchor.getRangeAt ? anchor.getRangeAt(0).getBoundingClientRect()
+      : anchor;
     const host = demo.getBoundingClientRect();
 
     card = document.createElement("div");

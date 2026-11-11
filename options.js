@@ -30,11 +30,13 @@ const DEFAULTS = {
   theme: "dark",
   exactMatch: true,
   trigger: "select",
+  hoverLinks: true,
   disabledSites: [],
 };
 
 const languageSelect = document.getElementById("language");
 const exactMatchInput = document.getElementById("exactMatch");
+const hoverLinksInput = document.getElementById("hoverLinks");
 const disabledSitesInput = document.getElementById("disabledSites");
 const statusEl = document.getElementById("status");
 let statusTimer = null;
@@ -50,6 +52,7 @@ for (const [code, label] of LANGUAGES) {
 chrome.storage.sync.get(DEFAULTS, (settings) => {
   languageSelect.value = settings.language;
   exactMatchInput.checked = settings.exactMatch;
+  hoverLinksInput.checked = settings.hoverLinks;
   disabledSitesInput.value = settings.disabledSites.join("\n");
   checkRadio("size", settings.size);
   checkRadio("theme", settings.theme);
@@ -62,6 +65,10 @@ languageSelect.addEventListener("change", () =>
 
 exactMatchInput.addEventListener("change", () =>
   save({ exactMatch: exactMatchInput.checked })
+);
+
+hoverLinksInput.addEventListener("change", () =>
+  save({ hoverLinks: hoverLinksInput.checked })
 );
 
 disabledSitesInput.addEventListener("input", () => {

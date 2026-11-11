@@ -68,7 +68,17 @@ const API_HEADERS = {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "wikilens-lookup") {
     const senderKey = sender.tab?.id ?? "extension";
-    lookupArticle(message.title, senderKey, sender.tab?.id)
+    // Lookups from a Wikipedia link name their wiki (lang) and may follow
+    // redirects (exact: false); the subdomain goes into fetch URLs, so it
+    // must be a plain language code.
+    const linkLang =
+      typeof message.lang === "string" && /^[a-z][a-z0-9-]{1,15}$/.test(message.lang)
+        ? message.lang
+        : null;
+    lookupArticle(message.title, senderKey, sender.tab?.id, {
+      lang: linkLang,
+      exact: message.exact !== false,
+    })
       .then((data) => {
         sendResponse({ ok: true, data });
         if (!data?.disambiguation) recordRecent(data); // fire-and-forget
@@ -157,14 +167,25 @@ async function recordRecent(data) {
 // images, and audio are fetched AFTER responding and streamed to the open
 // popup via a wikilens-enrich message, so slow Wikidata calls never delay
 // the popup itself.
-async function lookupArticle(title, senderKey = "extension", tabId = null) {
-  const { language, exactMatch, size } = await chrome.storage.sync.get({
+async function lookupArticle(
+  title,
+  senderKey = "extension",
+  tabId = null,
+  { lang: linkLang = null, exact = true } = {}
+) {
+  const stored = await chrome.storage.sync.get({
     language: DEFAULT_LANG,
     exactMatch: true,
     size: "medium",
   });
+  const { size } = stored;
+  const language = linkLang ?? stored.language;
+  const exactMatch = stored.exactMatch && exact;
 
-  const cacheKey = `${language}|${exactMatch}|${size}|${title.toLowerCase()}`;
+  // link lookups skip the English fallback, so they get their own cache
+  // entries: a link miss must not shadow a selection lookup that could fall back
+  const cacheKey =
+    `${linkLang ? "link:" : ""}${language}|${exactMatch}|${size}|${title.toLowerCase()}`;
   if (lookupCache.has(cacheKey)) {
     const cached = lookupCache.get(cacheKey);
     if (cached === CACHE_MISS) throw new Error("cached miss");
@@ -180,7 +201,9 @@ async function lookupArticle(title, senderKey = "extension", tabId = null) {
   // non-standard type), retry the identical logic against English once
   // before giving up. AbortErrors (superseded lookups) must propagate
   // immediately rather than trigger a fallback attempt.
-  const languages = language === "en" ? [language] : [language, "en"];
+  // A link names its wiki explicitly, so there is nothing to fall back to.
+  const languages =
+    linkLang || language === "en" ? [language] : [language, "en"];
 
   try {
     let lastErr;

@@ -1,6 +1,6 @@
 # WikiLens Privacy Policy
 
-*Last updated: July 4, 2026*
+*Last updated: November 11, 2026*
 
 WikiLens is a browser extension that shows a Wikipedia preview when you select
 text on a web page. It is designed to collect as little data as possible —
@@ -15,6 +15,12 @@ article summary. This is the extension's sole purpose and the only data that
 ever leaves your browser. The request goes directly from your browser to
 Wikipedia — there are no intermediary servers.
 
+**Hovered Wikipedia links.** When you rest the mouse on a link that points
+to a Wikipedia article, WikiLens sends that article's title (taken from the
+link's address) to the same Wikipedia API to fetch its summary. Only links
+to Wikipedia articles are considered; other links are never read or sent
+anywhere. This can be turned off in the settings.
+
 **Article identifier (Large popup size only).** When the popup size is set to
 Large, WikiLens additionally requests the matched article's public facts
 (such as birth date or population) from the Wikidata API (`wikidata.org`,
@@ -23,7 +29,7 @@ Wikidata identifier. No selected text or personal data is included in these
 requests.
 
 **Settings.** Your preferences (language, popup size, theme, trigger mode,
-matching mode, and your list of disabled sites) are stored using your
+link hover previews, matching mode, and your list of disabled sites) are stored using your
 browser's built-in extension storage (`storage.sync`), which may sync them
 across your own signed-in browser profiles via your browser vendor's sync
 service (e.g. Firefox Sync or Chrome Sync). Settings never leave that sync
@@ -42,7 +48,8 @@ extension's storage (or removing the extension) deletes it.
 - No data is sold or shared with third parties.
 - No cookies are set and no user identifiers are created.
 - No browsing history is read or recorded. The extension only reacts to an
-  explicit text selection, and only reads the selected text itself.
+  explicit text selection or to the mouse resting on a Wikipedia link, and
+  only reads the selected text or that link's article title.
 
 ## Third parties
 
